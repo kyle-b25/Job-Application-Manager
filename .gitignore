@@ -1,0 +1,21 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+*.user
+*.suo
+
+# Local SQLite database (lives in %LOCALAPPDATA%, but never commit a stray copy)
+*.db
+*.db-shm
+*.db-wal
+
+# Test results
+[Tt]est[Rr]esult*/
+*.trx
