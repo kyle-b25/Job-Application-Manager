@@ -49,8 +49,10 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <!-- GroupName ties the three together so exactly one reads as active; each
-                         IsChecked is bound one-way from the shell, which is the source of truth. -->
+                    <!-- GroupName ties the two together so exactly one reads as active; each
+                         IsChecked is bound one-way from the shell, which is the source of truth.
+                         The editor is not here: it is reached by opening a row, not by picking a
+                         section, so neither entry lights while it is showing. -->
                     <StackPanel DockPanel.Dock="Top">
                         <RadioButton Style="{StaticResource NavButton}"
                                      GroupName="Nav"
@@ -74,16 +76,6 @@
                             </StackPanel>
                         </RadioButton>
 
-                        <RadioButton Style="{StaticResource NavButton}"
-                                     GroupName="Nav"
-                                     IsChecked="{Binding IsEditorSelected, Mode=OneWay}"
-                                     Command="{Binding GoToNewApplicationCommand}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets"
-                                           FontSize="14" VerticalAlignment="Center" Width="24" />
-                                <TextBlock Text="Add New" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
                     </StackPanel>
 
                     <TextBlock DockPanel.Dock="Bottom"
@@ -92,6 +84,21 @@
                                Foreground="{StaticResource TextFaintBrush}"
                                TextWrapping="Wrap"
                                Text="Everything is stored locally on this PC." />
+
+                    <!-- An action, not a destination, so a Button outside GroupName="Nav" -
+                         a RadioButton here would leave the sidebar showing a section that is
+                         not on screen. -->
+                    <Button DockPanel.Dock="Bottom"
+                            Style="{StaticResource NavActionButton}"
+                            Margin="10,0,10,6"
+                            ToolTip="Open the folder holding jobapps.db"
+                            Command="{Binding OpenDataFolderCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE838;" FontFamily="Segoe MDL2 Assets"
+                                       FontSize="14" VerticalAlignment="Center" Width="24" />
+                            <TextBlock Text="Data folder" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                 </DockPanel>
             </Border>
         </Border>

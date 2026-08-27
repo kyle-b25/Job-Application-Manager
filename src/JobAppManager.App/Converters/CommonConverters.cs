@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
+using JobAppManager.Core.Enums;
 
 namespace JobAppManager.App.Converters;
 
@@ -51,6 +52,19 @@ public class EnumDisplayNameConverter : IValueConverter
 {
     public static string Humanize(object? value)
     {
+        // InterestLevel is named for the colour of its dot, which is right in the code and
+        // useless as a label - "Red" does not tell anyone whether that is good or bad.
+        if (value is InterestLevel interest)
+        {
+            return interest switch
+            {
+                InterestLevel.Red => "Low interest",
+                InterestLevel.Yellow => "Interested",
+                InterestLevel.Green => "High interest",
+                _ => interest.ToString()
+            };
+        }
+
         var name = value?.ToString();
 
         if (string.IsNullOrEmpty(name))

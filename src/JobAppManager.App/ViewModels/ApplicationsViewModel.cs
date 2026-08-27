@@ -194,8 +194,10 @@ public partial class ApplicationsViewModel : PageViewModel
         }
     }
 
+    /// <summary>The empty state's way out: applications are created on the dashboard, so this
+    /// page sends the user there rather than offering a second front door.</summary>
     [RelayCommand]
-    private void AddNew() => _navigation.GoToNewApplication();
+    private void GoToDashboard() => _navigation.GoToDashboard();
 
     /// <summary>Called by a row's own command; also bound directly by the detail pane.</summary>
     public void Edit(Application? application)
@@ -233,10 +235,13 @@ public partial class ApplicationsViewModel : PageViewModel
         await RefreshAsync();
     }
 
+    /// <summary>Back to the unfiltered, default-sorted list - the sort included, or "clear"
+    /// would leave the list in an order the user did not ask for and cannot see a reason for.</summary>
     [RelayCommand]
     private void ClearFilters()
     {
         SearchText = string.Empty;
         SelectedStatus = StatusOptions[0];
+        SelectedSort = SortOptions[0];
     }
 }

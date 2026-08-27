@@ -37,7 +37,7 @@
     <DataTemplate x:Key="InterestDotTemplate">
         <Ellipse Width="8" Height="8" VerticalAlignment="Center"
                  Fill="{Binding Converter={StaticResource InterestBrush}}"
-                 ToolTip="{Binding Converter={StaticResource EnumDisplayName}, StringFormat='Interest: {0}'}" />
+                 ToolTip="{Binding Converter={StaticResource EnumDisplayName}}" />
     </DataTemplate>
 
 </ResourceDictionary>

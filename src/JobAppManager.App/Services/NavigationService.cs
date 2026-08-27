@@ -21,7 +21,5 @@ public sealed class NavigationService : INavigationService
 
     public void GoToApplications() => Shell.GoToApplications();
 
-    public void GoToNewApplication() => Shell.GoToNewApplication();
-
     public void GoToEditApplication(int applicationId) => Shell.GoToEditApplication(applicationId);
 }

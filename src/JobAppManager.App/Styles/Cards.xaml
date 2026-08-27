@@ -109,4 +109,38 @@
         </Setter>
     </Style>
 
+    <!-- NavButton's twin for the one sidebar entry that runs an action instead of switching
+         pages: same chrome and hover, no active marker, because it is never "current". -->
+    <Style x:Key="NavActionButton" TargetType="Button">
+        <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}" />
+        <Setter Property="FontSize" Value="13.5" />
+        <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Chrome" Background="Transparent"
+                            CornerRadius="{StaticResource ControlCornerRadius}"
+                            Padding="14,10">
+                        <ContentPresenter VerticalAlignment="Center" RecognizesAccessKey="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background"
+                                    Value="{StaticResource SurfaceRaisedBrush}" />
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Chrome" Property="Background"
+                                    Value="{StaticResource AccentDimBrush}" />
+                            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

@@ -15,18 +15,11 @@
         </Grid.RowDefinitions>
 
         <!-- ==================== Header ==================== -->
-        <Grid Grid.Row="0">
-            <StackPanel>
-                <TextBlock Text="{Binding Title}" Style="{StaticResource PageTitleText}" />
-                <TextBlock Text="{Binding Subtitle}" Style="{StaticResource PageSubtitleText}"
-                           Visibility="{Binding Subtitle, Converter={StaticResource Truthy}}" />
-            </StackPanel>
-
-            <Button Content="Add application"
-                    Style="{StaticResource PrimaryButton}"
-                    HorizontalAlignment="Right" VerticalAlignment="Top"
-                    Command="{Binding AddNewCommand}" />
-        </Grid>
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="{Binding Title}" Style="{StaticResource PageTitleText}" />
+            <TextBlock Text="{Binding Subtitle}" Style="{StaticResource PageSubtitleText}"
+                       Visibility="{Binding Subtitle, Converter={StaticResource Truthy}}" />
+        </StackPanel>
 
         <!-- ==================== Filter bar ==================== -->
         <Grid Grid.Row="1" Margin="0,22,0,16"
@@ -35,10 +28,11 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <Grid Grid.Column="0" MaxWidth="420" HorizontalAlignment="Left">
+            <!-- Stretches across whatever the two dropdowns leave: a company name and a job
+                 title is a lot to fit in a box capped at a few hundred pixels. -->
+            <Grid Grid.Column="0" MinWidth="260">
                 <TextBox Style="{StaticResource FieldTextBox}"
                          Padding="34,8,10,8"
                          Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged, Delay=0}" />
@@ -81,10 +75,6 @@
                 </ComboBox.ItemTemplate>
             </ComboBox>
 
-            <Button Grid.Column="3" Margin="10,0,0,0"
-                    Content="Clear"
-                    Style="{StaticResource SecondaryButton}"
-                    Command="{Binding ClearFiltersCommand}" />
         </Grid>
 
         <!-- ==================== List + detail ==================== -->
@@ -261,13 +251,13 @@
                 <TextBlock Style="{StaticResource MutedText}"
                            Margin="0,8,0,0"
                            TextAlignment="Center" TextWrapping="Wrap"
-                           Text="Track a role you have applied to - or one you are still eyeing up - and the dashboard starts filling in from there." />
+                           Text="Applications are added from the quick-submit box on the dashboard. Log one there and it shows up here." />
 
-                <Button Content="Add your first application"
+                <Button Content="Go to dashboard"
                         Style="{StaticResource PrimaryButton}"
                         Margin="0,24,0,0"
                         HorizontalAlignment="Center"
-                        Command="{Binding AddNewCommand}" />
+                        Command="{Binding GoToDashboardCommand}" />
             </StackPanel>
         </Border>
 

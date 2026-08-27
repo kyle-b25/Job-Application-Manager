@@ -12,8 +12,6 @@ public sealed class FakeNavigationService : INavigationService
 
     public int ApplicationsCount { get; private set; }
 
-    public int NewApplicationCount { get; private set; }
-
     /// <summary>Every id passed to <see cref="GoToEditApplication"/>, in order.</summary>
     public List<int> EditedIds { get; } = new();
 
@@ -21,9 +19,16 @@ public sealed class FakeNavigationService : INavigationService
 
     public void GoToApplications() => ApplicationsCount++;
 
-    public void GoToNewApplication() => NewApplicationCount++;
-
     public void GoToEditApplication(int applicationId) => EditedIds.Add(applicationId);
+}
+
+/// <summary>Records the paths a ViewModel asked the shell to open, instead of opening them -
+/// a test run must not spawn Explorer windows.</summary>
+public sealed class FakeShellLauncher : IShellLauncher
+{
+    public List<string> OpenedFolders { get; } = new();
+
+    public void OpenFolder(string path) => OpenedFolders.Add(path);
 }
 
 /// <summary>A dialog service that never shows anything and answers however the test says.</summary>

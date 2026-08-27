@@ -1,10 +1,13 @@
+using System.IO;
 using JobAppManager.App.Services;
 using JobAppManager.App.ViewModels;
+using JobAppManager.Data;
 using Xunit;
 
 namespace JobAppManager.App.Tests;
 
-/// <summary>The shell's page switching and, more importantly, which sidebar entry it lights.</summary>
+/// <summary>The shell's page switching, which sidebar entry it lights, and the one sidebar
+/// entry that is an action rather than a destination.</summary>
 public class MainViewModelTests : ViewModelTestBase
 {
     private readonly ApplicationsViewModel _applications;
@@ -17,7 +20,7 @@ public class MainViewModelTests : ViewModelTestBase
         _applications = NewApplicationsViewModel();
         _editor = NewEditorViewModel();
         _dashboard = NewDashboardViewModel();
-        _shell = new MainViewModel(_dashboard, _applications, _editor);
+        _shell = new MainViewModel(_dashboard, _applications, _editor, ShellLauncher);
     }
 
     [Fact]
@@ -33,54 +36,40 @@ public class MainViewModelTests : ViewModelTestBase
         _shell.GoToApplicationsCommand.Execute(null);
         AssertOnlySelected(applications: true);
 
-        _shell.GoToNewApplicationCommand.Execute(null);
-        AssertOnlySelected(editor: true);
-
         _shell.GoToDashboardCommand.Execute(null);
         AssertOnlySelected(dashboard: true);
     }
 
     [Fact]
-    public void GoToNewApplication_ShowsTheEditorInNewMode()
-    {
-        _shell.GoToNewApplication();
-
-        Assert.Same(_editor, _shell.CurrentPage);
-        Assert.True(_editor.IsNew);
-        Assert.True(_shell.IsEditorSelected);
-    }
-
-    [Fact]
-    public async Task GoToEditApplication_ShowsTheEditorWithoutLightingAddNew()
+    public async Task GoToEditApplication_ShowsTheEditorAndDarkensBothNavEntries()
     {
         var seeded = await SeedAsync(b => b.At("Editing Co"));
 
         _shell.GoToEditApplication(seeded.Id);
 
-        // The load is async and completes after the page has already been switched, so this is
-        // the wiring that re-raises IsEditorSelected once IsNew flips.
-        await WaitUntilAsync(() => !_editor.IsNew);
+        // The load is fire-and-forget: the page is switched first and filled in after.
+        await WaitUntilAsync(() => _editor.CompanyName == "Editing Co");
 
         Assert.Same(_editor, _shell.CurrentPage);
-        Assert.Equal("Editing Co", _editor.CompanyName);
 
-        // "Add New" must stay dark: the user is changing a record, not creating one.
-        Assert.False(_shell.IsEditorSelected);
-        AssertOnlySelected();
+        // The editor is not a sidebar section - it is reached by opening a row - so neither
+        // Dashboard nor Applications may claim to be the page on screen.
+        Assert.False(_shell.IsDashboardSelected);
+        Assert.False(_shell.IsApplicationsSelected);
     }
 
     [Fact]
-    public async Task ReturningToAddNew_AfterAnEdit_LightsAddNewAgain()
+    public void OpenDataFolder_HandsTheShellTheFolderNotTheDatabaseFile()
     {
-        var seeded = await SeedAsync(b => b.At("Editing Co"));
+        _shell.OpenDataFolderCommand.Execute(null);
 
-        _shell.GoToEditApplication(seeded.Id);
-        await WaitUntilAsync(() => !_editor.IsNew);
-        Assert.False(_shell.IsEditorSelected);
+        var opened = Assert.Single(ShellLauncher.OpenedFolders);
 
-        _shell.GoToNewApplication();
-
-        Assert.True(_shell.IsEditorSelected);
+        // The folder, so the user lands somewhere they can copy or back the file up from.
+        Assert.Equal(
+            Path.GetDirectoryName(DbPathProvider.GetDefaultDatabasePath()),
+            opened);
+        Assert.True(Directory.Exists(opened));
     }
 
     [Fact]
@@ -98,14 +87,11 @@ public class MainViewModelTests : ViewModelTestBase
         Assert.Contains(nameof(MainViewModel.IsEditorSelected), raised);
     }
 
-    private void AssertOnlySelected(
-        bool dashboard = false,
-        bool applications = false,
-        bool editor = false)
+    private void AssertOnlySelected(bool dashboard = false, bool applications = false)
     {
         Assert.Equal(dashboard, _shell.IsDashboardSelected);
         Assert.Equal(applications, _shell.IsApplicationsSelected);
-        Assert.Equal(editor, _shell.IsEditorSelected);
+        Assert.False(_shell.IsEditorSelected);
     }
 
     /// <summary>Waits for a fire-and-forget load the shell kicked off without awaiting.</summary>
@@ -142,7 +128,7 @@ public class NavigationServiceTests
         context.Navigation.GoToApplications();
         Assert.Same(context.Applications, context.Shell.CurrentPage);
 
-        context.Navigation.GoToNewApplication();
+        context.Navigation.GoToEditApplication(1);
         Assert.Same(context.Editor, context.Shell.CurrentPage);
 
         context.Navigation.GoToDashboard();
@@ -158,7 +144,7 @@ public class NavigationServiceTests
             Dashboard = NewDashboardViewModel();
             Applications = NewApplicationsViewModel();
             Editor = NewEditorViewModel();
-            Shell = new MainViewModel(Dashboard, Applications, Editor);
+            Shell = new MainViewModel(Dashboard, Applications, Editor, new FakeShellLauncher());
             Navigation = new NavigationService();
             Navigation.Attach(Shell);
         }

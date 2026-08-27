@@ -71,6 +71,7 @@ public partial class App : Application
         services.AddSingleton<NavigationService>();
         services.AddSingleton<INavigationService>(sp => sp.GetRequiredService<NavigationService>());
         services.AddSingleton<IDialogService, DialogService>();
+        services.AddSingleton<IShellLauncher, ShellLauncher>();
 
         // Pages are singletons so navigating away and back keeps scroll position, filters, and
         // an in-progress form rather than resetting them.

@@ -439,6 +439,11 @@
          repeat buttons and reads as a Windows 7 leftover next to everything else here. -->
     <Style x:Key="ScrollThumb" TargetType="Thumb">
         <Setter Property="IsTabStop" Value="False" />
+        <!-- Track gives the thumb a size proportional to the viewport and nothing else. The
+             stock chrome carries a floor; a bare Track does not, so past a couple of screens
+             of rows the thumb shrinks to a sliver nobody can grab. -->
+        <Setter Property="MinHeight" Value="28" />
+        <Setter Property="MinWidth" Value="28" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Thumb">
@@ -480,6 +485,9 @@
                         <Trigger Property="Orientation" Value="Horizontal">
                             <Setter Property="Height" Value="10" />
                             <Setter Property="Width" Value="Auto" />
+                            <!-- Track defaults to Vertical; without this the horizontal bar
+                                 renders but never moves. -->
+                            <Setter TargetName="PART_Track" Property="Orientation" Value="Horizontal" />
                             <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False" />
                         </Trigger>
                     </ControlTemplate.Triggers>

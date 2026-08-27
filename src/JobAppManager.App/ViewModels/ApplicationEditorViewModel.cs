@@ -35,8 +35,9 @@ public record StatusHistoryRow(ApplicationStatus Status, DateTime ChangedLocal, 
     public string WhenText => ChangedLocal.ToString("d MMM yyyy, h:mm tt");
 }
 
-/// <summary>Add and Edit are the same form, so they are the same ViewModel. The only difference
-/// is whether <see cref="_applicationId"/> is set, which decides insert vs update on save.</summary>
+/// <summary>The full record for one existing application. Applications are only ever created
+/// from the dashboard's quick-submit box, so this form only ever updates - it is reached by
+/// editing a row, never with a blank slate.</summary>
 public partial class ApplicationEditorViewModel : ObservableValidator
 {
     private readonly RepositoryFactory _repositories;
@@ -44,7 +45,7 @@ public partial class ApplicationEditorViewModel : ObservableValidator
     private readonly IDialogService _dialogs;
     private readonly TimeProvider _timeProvider;
 
-    private int? _applicationId;
+    private int _applicationId;
 
     /// <summary>What the status was when the form was loaded, so save can tell a real transition
     /// from "the user never touched the dropdown".</summary>
@@ -74,15 +75,11 @@ public partial class ApplicationEditorViewModel : ObservableValidator
 
     public ObservableCollection<StatusHistoryRow> StatusHistory { get; } = new();
 
-    public bool IsNew => _applicationId is null;
+    public string Title => "Edit application";
 
-    public string Title => IsNew ? "Add application" : "Edit application";
+    public string Subtitle => $"{CompanyName} - {JobTitle}";
 
-    public string Subtitle => IsNew
-        ? "Company and job title are all you need to start; the rest can come later."
-        : $"{CompanyName} - {JobTitle}";
-
-    public string SaveLabel => IsNew ? "Add application" : "Save changes";
+    public string SaveLabel => "Save changes";
 
     // ---------------- Fields ----------------
 
@@ -153,7 +150,7 @@ public partial class ApplicationEditorViewModel : ObservableValidator
     public bool ShowsInterviewFields => Status == ApplicationStatus.Interview;
 
     /// <summary>The status-change note only earns its space when the status is actually moving.</summary>
-    public bool IsStatusChanging => !IsNew && Status != _statusOnLoad;
+    public bool IsStatusChanging => Status != _statusOnLoad;
 
     public bool HasStatusHistory => StatusHistory.Count > 0;
 
@@ -208,33 +205,6 @@ public partial class ApplicationEditorViewModel : ObservableValidator
             : ValidationResult.Success;
 
     // ---------------- Loading ----------------
-
-    /// <summary>Resets the form to a blank application.</summary>
-    public void LoadNew()
-    {
-        _applicationId = null;
-        _statusOnLoad = ApplicationStatus.Applied;
-
-        CompanyName = string.Empty;
-        JobTitle = string.Empty;
-        Location = string.Empty;
-        JobUrl = null;
-        DateApplied = Today;
-        Status = ApplicationStatus.Applied;
-        InterestLevel = InterestLevel.Yellow;
-        InterviewRound = null;
-        InterviewDate = null;
-        FromJobFair = false;
-        ResumeSubmitted = false;
-        CoverLetterSubmitted = false;
-        Notes = null;
-        StatusChangeNote = null;
-        Contacts.Clear();
-        StatusHistory.Clear();
-
-        ClearErrors();
-        NotifyModeChanged();
-    }
 
     /// <summary>Copies an existing application into the form. Fields are copied rather than bound
     /// through, because the entities are plain POCOs with no change notification of their own.</summary>
@@ -299,10 +269,7 @@ public partial class ApplicationEditorViewModel : ObservableValidator
 
     private void NotifyModeChanged()
     {
-        OnPropertyChanged(nameof(IsNew));
-        OnPropertyChanged(nameof(Title));
         OnPropertyChanged(nameof(Subtitle));
-        OnPropertyChanged(nameof(SaveLabel));
         OnPropertyChanged(nameof(ShowsInterviewFields));
         OnPropertyChanged(nameof(IsStatusChanging));
         OnPropertyChanged(nameof(HasStatusHistory));
@@ -356,52 +323,43 @@ public partial class ApplicationEditorViewModel : ObservableValidator
         {
             await using var scope = _repositories.Create();
 
-            if (_applicationId is { } id)
+            var existing = await scope.Repository.GetByIdAsync(_applicationId);
+
+            if (existing is null)
             {
-                var existing = await scope.Repository.GetByIdAsync(id);
+                _dialogs.ShowError("Not found", "That application no longer exists.");
+                _navigation.GoToApplications();
+                return;
+            }
 
-                if (existing is null)
+            ApplyTo(existing, contacts);
+
+            // Status deliberately excluded from ApplyTo: moving through the pipeline has to go
+            // through the repository so the change lands in the history too.
+            await scope.Repository.UpdateAsync(existing);
+
+            if (Status != _statusOnLoad)
+            {
+                await scope.Repository.ChangeStatusAsync(
+                    _applicationId,
+                    Status,
+                    string.IsNullOrWhiteSpace(StatusChangeNote) ? null : StatusChangeNote.Trim());
+
+                // The round number and interview date are set on the entity, but
+                // ChangeStatusAsync clears both when moving away from Interview - so re-apply
+                // them for a move *into* Interview.
+                if (Status == ApplicationStatus.Interview
+                    && (InterviewRound is not null || InterviewDate is not null))
                 {
-                    _dialogs.ShowError("Not found", "That application no longer exists.");
-                    _navigation.GoToApplications();
-                    return;
-                }
+                    var refreshed = await scope.Repository.GetByIdAsync(_applicationId);
 
-                ApplyTo(existing, contacts);
-
-                // Status deliberately excluded from ApplyTo: moving through the pipeline has to
-                // go through the repository so the change lands in the history too.
-                await scope.Repository.UpdateAsync(existing);
-
-                if (Status != _statusOnLoad)
-                {
-                    await scope.Repository.ChangeStatusAsync(
-                        id,
-                        Status,
-                        string.IsNullOrWhiteSpace(StatusChangeNote) ? null : StatusChangeNote.Trim());
-
-                    // The round number and interview date are set on the entity, but
-                    // ChangeStatusAsync clears both when moving away from Interview - so
-                    // re-apply them for a move *into* Interview.
-                    if (Status == ApplicationStatus.Interview
-                        && (InterviewRound is not null || InterviewDate is not null))
+                    if (refreshed is not null)
                     {
-                        var refreshed = await scope.Repository.GetByIdAsync(id);
-
-                        if (refreshed is not null)
-                        {
-                            refreshed.InterviewRound = InterviewRound;
-                            refreshed.InterviewDate = InterviewDate;
-                            await scope.Repository.UpdateAsync(refreshed);
-                        }
+                        refreshed.InterviewRound = InterviewRound;
+                        refreshed.InterviewDate = InterviewDate;
+                        await scope.Repository.UpdateAsync(refreshed);
                     }
                 }
-            }
-            else
-            {
-                var application = new Application { Status = Status };
-                ApplyTo(application, contacts);
-                await scope.Repository.AddAsync(application);
             }
         }
         finally

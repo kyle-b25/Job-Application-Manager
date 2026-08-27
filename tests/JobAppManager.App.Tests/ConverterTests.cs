@@ -20,6 +20,15 @@ public class EnumDisplayNameConverterTests
     public void Humanize_NamesEveryStage(ApplicationStatus status, string expected) =>
         Assert.Equal(expected, EnumDisplayNameConverter.Humanize(status));
 
+    // InterestLevel is named for the colour of its dot, which is the right name in the code and
+    // a useless label on screen - "Red" does not say whether that is good or bad.
+    [Theory]
+    [InlineData(InterestLevel.Red, "Low interest")]
+    [InlineData(InterestLevel.Yellow, "Interested")]
+    [InlineData(InterestLevel.Green, "High interest")]
+    public void Humanize_ReadsInterestAsAJudgementNotAColour(InterestLevel level, string expected) =>
+        Assert.Equal(expected, EnumDisplayNameConverter.Humanize(level));
+
     // No status is PascalCase any more, but the sort dropdown still renders one, so the split
     // has to keep working somewhere the UI actually depends on it.
     [Theory]

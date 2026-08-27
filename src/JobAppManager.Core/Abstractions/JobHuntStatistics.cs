@@ -41,12 +41,6 @@ public record JobHuntStatistics
     /// application appear; the chart layer fills the gaps.</summary>
     public IReadOnlyList<MonthlyApplicationCount> MonthlyCounts { get; init; }
         = Array.Empty<MonthlyApplicationCount>();
-
-    /// <summary>Average time applications spent sitting in each stage before moving on, derived
-    /// from consecutive status changes. A stage nothing has ever left is omitted, so the chart
-    /// layer decides how to show "no data yet" rather than being handed a misleading zero.</summary>
-    public IReadOnlyList<StageDuration> AverageDaysInStage { get; init; }
-        = Array.Empty<StageDuration>();
 }
 
 public record DailyApplicationCount(DateOnly Date, int Count);
@@ -54,8 +48,3 @@ public record DailyApplicationCount(DateOnly Date, int Count);
 /// <param name="Year">Calendar year.</param>
 /// <param name="Month">1-12.</param>
 public record MonthlyApplicationCount(int Year, int Month, int Count);
-
-/// <param name="Stage">The stage being measured.</param>
-/// <param name="AverageDays">Mean days from entering the stage to leaving it.</param>
-/// <param name="SampleSize">How many completed stints that average is over.</param>
-public record StageDuration(ApplicationStatus Stage, double AverageDays, int SampleSize);

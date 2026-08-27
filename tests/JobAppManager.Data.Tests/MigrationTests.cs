@@ -306,10 +306,14 @@ public class MigrationTests : IDisposable
         Assert.Equal(1d, stats.InterviewRate);
         Assert.Equal(0d, stats.RejectionRate);
 
-        // Applied -> Interview, ten days apart, and still measurable after the remap.
-        var stage = Assert.Single(stats.AverageDaysInStage);
-        Assert.Equal(ApplicationStatus.Applied, stage.Stage);
-        Assert.Equal(10d, stage.AverageDays);
+        // The remapped history survived: both rows came through, so the rates above are answered
+        // from real transitions rather than from an empty StatusChanges table.
+        Assert.Equal(
+            new[] { ApplicationStatus.Applied, ApplicationStatus.Interview },
+            loaded.StatusHistory.OrderBy(h => h.ChangedUtc).Select(h => h.Status));
+
+        Assert.Equal(1, stats.CountByStatus[ApplicationStatus.Interview]);
+        Assert.Equal(0, stats.CountByStatus[ApplicationStatus.Rejected]);
     }
 
     public void Dispose()

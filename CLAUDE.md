@@ -5,8 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project
 
 A local Windows 11 job-application tracker with persistent SQLite storage, built to the SRS
-(rev 1.0). Three screens: a dashboard (quick-submit box + hunt statistics and graphs), an add/edit
-application page, and a sortable/filterable applications list.
+(rev 1.0). Three screens: a dashboard (quick-submit box + hunt statistics and graphs), a
+sortable/filterable applications list, and an edit page for one application.
+
+**Applications are created in exactly one place: the dashboard quick-submit box.** The editor is
+reached only by opening an existing row - there is no "Add New" nav entry and no blank-form mode,
+because two front doors for the same thing is what the single box replaced.
 
 **Current state: complete.** WPF on .NET 8, MVVM via CommunityToolkit.Mvvm, charts via
 LiveCharts2. All three screens exist and the app ships with no seed data.
@@ -71,8 +75,8 @@ and `InterviewDate` sits beside it under the same rule.
 Applied → Interview → Rejected — where Rejected is reachable from either of the others.
 `Application.Status` is only the latest entry — **always move an application with
 `IApplicationRepository.ChangeStatusAsync`**, never by assigning `Status`. Assigning it directly
-leaves no `StatusChange` behind, and the interview/rejection rates and the stage-duration chart are
-computed entirely from that history.
+leaves no `StatusChange` behind, and the interview and rejection rates are computed entirely from
+that history.
 
 **`InterviewRound` and `InterviewDate` only exist inside Interview.** `ChangeStatusAsync` nulls
 both when moving to any other stage, so a move *into* Interview that also sets them has to re-apply
@@ -99,14 +103,15 @@ case-sensitive, and a search box should not be. Search terms go through `ToLikeP
 escapes `%`, `_`, and the escape character itself and declares `ESCAPE` on the call — otherwise a
 user typing `%` matches every row. `GetStatisticsAsync` aggregates in SQL and
 zero-fills every enum member so the UI never handles a missing dictionary key. It deliberately
-omits empty days, empty months, and stages nothing has left — the chart layer fills those gaps,
-because a fabricated zero and "no data yet" are different statements.
+omits empty days and empty months — the chart layer fills those gaps, because a fabricated zero
+and "no data yet" are different statements.
 
 ## Tests
 
 ```
 tests/JobAppManager.TestSupport/   SqliteTestFixture, FixedClock, ApplicationBuilder, TestData
 tests/JobAppManager.Data.Tests/    repository, persistence, statistics, status history, migrations
+                                  (StageAnalyticsTests covers the history-derived rates)
 tests/JobAppManager.App.Tests/     ViewModels, converters, navigation  (net8.0-windows, UseWPF)
 ```
 
@@ -159,3 +164,13 @@ the main way an app still looks default.
   `DisplayMemberPath`. With `DisplayMemberPath` the selected item renders as its `ToString()`.
 - Entities are plain POCOs with no `INotifyPropertyChanged`. The editor copies fields in and out
   of an `ObservableValidator` rather than binding a form straight to an `Application`.
+- The custom `ScrollBar` template in `Controls.xaml` is a bare `Track`, which inherits none of the
+  stock chrome's safeguards: the thumb needs an explicit `MinHeight`/`MinWidth` or it shrinks to an
+  ungrabbable sliver on a long list, and the horizontal trigger has to set `Track.Orientation` as
+  well as `IsDirectionReversed`.
+- Neither dashboard chart is hoverable — `IsHoverable = false` on the series plus
+  `TooltipPosition="Hidden"` on the control, and `HoverPushout = 0` so a pie slice does not slide
+  out from under the cursor. The counts are printed on the marks instead.
+- `InterestLevel` members are named for their dot colour (`Red`/`Yellow`/`Green`); the labels come
+  from `EnumDisplayNameConverter.Humanize`, which maps them to "Low interest" / "Interested" /
+  "High interest". Never render an `InterestLevel` with `ToString()`.

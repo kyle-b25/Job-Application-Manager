@@ -232,12 +232,12 @@ public class ApplicationsViewModelTests : ViewModelTestBase
     }
 
     [Fact]
-    public void AddNew_NavigatesToTheEditor()
+    public void GoToDashboard_SendsTheUserWhereApplicationsAreCreated()
     {
         var vm = NewApplicationsViewModel();
 
-        vm.AddNewCommand.Execute(null);
+        vm.GoToDashboardCommand.Execute(null);
 
-        Assert.Equal(1, Navigation.NewApplicationCount);
+        Assert.Equal(1, Navigation.DashboardCount);
     }
 }

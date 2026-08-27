@@ -5,14 +5,12 @@ using Xunit;
 
 namespace JobAppManager.Data.Tests;
 
-/// <summary>The history-derived dashboard numbers: active count, interview/offer rates, and
-/// average days in each stage.
+/// <summary>The history-derived dashboard numbers: active count and the interview/rejection
+/// rates, which are read off the status history rather than the current column.
 ///
-/// Every stint here is built by moving a <see cref="FixedClock"/> forward between real
-/// <c>ChangeStatusAsync</c> calls. The earlier version inserted history rows with raw SQL to
-/// fabricate timestamps, which meant these tests never actually exercised the code path the app
-/// uses - and its hand-formatted timestamps would have been wrong under a non-Gregorian calendar.
-/// </summary>
+/// Every move here is made by advancing a <see cref="FixedClock"/> and calling the real
+/// <c>ChangeStatusAsync</c>. Inserting history rows with raw SQL instead would skip the code path
+/// the app actually uses, which is the one worth testing.</summary>
 public class StageAnalyticsTests : IDisposable
 {
     private readonly FixedClock _clock = new(new DateTimeOffset(2026, 5, 4, 9, 0, 0, TimeSpan.Zero));
@@ -52,15 +50,16 @@ public class StageAnalyticsTests : IDisposable
     }
 
     [Fact]
-    public async Task EmptyDatabase_ReportsZeroRatesAndNoStageDurations()
+    public async Task EmptyDatabase_ReportsZeroRates()
     {
         var stats = await StatisticsAsync();
 
         Assert.Equal(0, stats.TotalApplications);
         Assert.Equal(0, stats.ActiveApplications);
+
+        // Zero rather than NaN: nothing divided by nothing still has to render as "0%".
         Assert.Equal(0d, stats.InterviewRate);
         Assert.Equal(0d, stats.RejectionRate);
-        Assert.Empty(stats.AverageDaysInStage);
         Assert.Empty(stats.MonthlyCounts);
     }
 
@@ -113,84 +112,6 @@ public class StageAnalyticsTests : IDisposable
         Assert.Equal(2, stats.TotalApplications);
         Assert.Equal(0d, stats.InterviewRate);
         Assert.Equal(0d, stats.RejectionRate);
-    }
-
-    [Fact]
-    public async Task AverageDaysInStage_AveragesCompletedStintsOnly()
-    {
-        var first = await AddAsync("Alpha", ApplicationStatus.Applied);
-        var second = await AddAsync("Beta", ApplicationStatus.Applied);
-
-        await MoveAfterAsync(first, 4, ApplicationStatus.Interview);
-        await MoveAfterAsync(second, 6, ApplicationStatus.Interview);   // 4 + 6 = 10 days after its own start
-
-        var stats = await StatisticsAsync();
-
-        var applied = Assert.Single(stats.AverageDaysInStage);
-        Assert.Equal(ApplicationStatus.Applied, applied.Stage);
-        Assert.Equal(7d, applied.AverageDays, 6);
-        Assert.Equal(2, applied.SampleSize);
-
-        // Interview is where both currently sit; an unfinished stint is not an average.
-        Assert.DoesNotContain(stats.AverageDaysInStage, d => d.Stage == ApplicationStatus.Interview);
-    }
-
-    [Fact]
-    public async Task AverageDaysInStage_DoesNotPairAcrossApplications()
-    {
-        await AddAsync("Alpha", ApplicationStatus.Applied);
-        _clock.AdvanceDays(30);
-        await AddAsync("Beta", ApplicationStatus.Applied);
-
-        var stats = await StatisticsAsync();
-
-        // One history row each and no transitions: the month between them is not a stint.
-        Assert.Empty(stats.AverageDaysInStage);
-    }
-
-    [Fact]
-    public async Task AverageDaysInStage_ReportsEveryCompletedStageInPipelineOrder()
-    {
-        var id = await AddAsync("Alpha", ApplicationStatus.Applied);
-
-        await MoveAfterAsync(id, 8, ApplicationStatus.Interview);
-        await MoveAfterAsync(id, 12, ApplicationStatus.Rejected);
-
-        var stats = await StatisticsAsync();
-
-        Assert.Equal(
-            new[]
-            {
-                (ApplicationStatus.Applied, 8d),
-                (ApplicationStatus.Interview, 12d)
-            },
-            stats.AverageDaysInStage.Select(d => (d.Stage, d.AverageDays)));
-
-        // Rejected is the stage it is sitting in now, so it has no completed stint to average.
-        Assert.DoesNotContain(stats.AverageDaysInStage, d => d.Stage == ApplicationStatus.Rejected);
-    }
-
-    [Fact]
-    public async Task AverageDaysInStage_HandlesTwoMovesAtTheSameInstant()
-    {
-        var id = await AddAsync("Alpha", ApplicationStatus.Applied);
-
-        await MoveAfterAsync(id, 6, ApplicationStatus.Interview);
-
-        // Same instant: someone advancing two stages in one sitting. Without the ThenBy(Id)
-        // tie-break the pairing order would be undefined and the zero-length stint could be
-        // attributed to the wrong stage.
-        await MoveAfterAsync(id, 0, ApplicationStatus.Rejected);
-
-        var stats = await StatisticsAsync();
-
-        Assert.Equal(
-            new[]
-            {
-                (ApplicationStatus.Applied, 6d),
-                (ApplicationStatus.Interview, 0d)
-            },
-            stats.AverageDaysInStage.Select(d => (d.Stage, d.AverageDays)));
     }
 
     [Fact]

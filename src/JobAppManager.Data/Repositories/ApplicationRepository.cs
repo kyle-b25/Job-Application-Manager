@@ -22,8 +22,8 @@ public class ApplicationRepository : IApplicationRepository
         Application application,
         CancellationToken cancellationToken = default)
     {
-        // Every application starts its history at whatever status it was created in, so
-        // "days in stage" has a beginning to measure from even for a row nobody ever advances.
+        // Every application starts its history at whatever status it was created in, so the
+        // timeline reads as a complete sequence even for a row nobody ever advances.
         if (application.StatusHistory.Count == 0)
         {
             application.StatusHistory.Add(new StatusChange { Status = application.Status });
@@ -244,49 +244,8 @@ public class ApplicationRepository : IApplicationRepository
                 .ToList(),
             MonthlyCounts = monthlyCounts
                 .Select(x => new MonthlyApplicationCount(x.Year, x.Month, x.Count))
-                .ToList(),
-            AverageDaysInStage = await GetAverageDaysInStageAsync(cancellationToken)
+                .ToList()
         };
-    }
-
-    /// <summary>Mean days each stage was held before the next transition, over every completed
-    /// stint. The stage an application currently sits in contributes nothing - that stint has no
-    /// end yet, and counting "so far" would drag every average toward zero as rows are added.</summary>
-    private async Task<IReadOnlyList<StageDuration>> GetAverageDaysInStageAsync(
-        CancellationToken cancellationToken)
-    {
-        // Projected to three columns and paired in memory: SQLite has no window functions EF 8
-        // can translate here, and one row per status change is a small table by construction.
-        var changes = await _context.StatusChanges
-            .OrderBy(s => s.ApplicationId).ThenBy(s => s.ChangedUtc).ThenBy(s => s.Id)
-            .Select(s => new { s.ApplicationId, s.Status, s.ChangedUtc })
-            .ToListAsync(cancellationToken);
-
-        var stints = new Dictionary<ApplicationStatus, (double TotalDays, int Count)>();
-
-        for (var i = 1; i < changes.Count; i++)
-        {
-            var previous = changes[i - 1];
-            var current = changes[i];
-
-            // Only consecutive rows for the *same* application form a stint.
-            if (previous.ApplicationId != current.ApplicationId)
-            {
-                continue;
-            }
-
-            var days = (current.ChangedUtc - previous.ChangedUtc).TotalDays;
-            var existing = stints.TryGetValue(previous.Status, out var v) ? v : (0d, 0);
-            stints[previous.Status] = (existing.Item1 + days, existing.Item2 + 1);
-        }
-
-        return stints
-            .OrderBy(kvp => kvp.Key)
-            .Select(kvp => new StageDuration(
-                kvp.Key,
-                kvp.Value.TotalDays / kvp.Value.Count,
-                kvp.Value.Count))
-            .ToList();
     }
 
     /// <summary>Share, or zero when there is nothing to take a share of.</summary>

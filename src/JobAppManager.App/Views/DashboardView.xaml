@@ -34,15 +34,15 @@
                 <StackPanel>
                     <TextBlock Text="Submit an application" Style="{StaticResource SectionTitleText}" />
                     <TextBlock Style="{StaticResource MutedText}" FontSize="12" Margin="0,3,0,14"
-                               Text="Logged as Applied, dated today. Fill in the rest whenever you like." />
+                               Text="Logged as Applied, dated today. This is the only place applications are created - open a row later to fill in the rest." />
 
+                    <!-- Row 1: the identity of the role. -->
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="150" />
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="170" />
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0" Margin="0,0,8,0">
@@ -63,7 +63,7 @@
                                      Text="{Binding QuickLocation, UpdateSourceTrigger=PropertyChanged}" />
                         </StackPanel>
 
-                        <StackPanel Grid.Column="3" Margin="8,0">
+                        <StackPanel Grid.Column="3" Margin="8,0,0,0">
                             <TextBlock Text="INTEREST" Style="{StaticResource FieldLabelText}" />
                             <!-- Explicit ItemTemplate, not DisplayMemberPath: the custom ComboBox
                                  template binds the selection box to ItemTemplate. -->
@@ -82,11 +82,59 @@
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
                         </StackPanel>
+                    </Grid>
 
-                        <Button Grid.Column="4" Margin="8,0,0,0"
+                    <!-- Row 2: who you talked to. Contact.Email is required by the schema, so
+                         the pair has to be filled in together or left alone entirely. -->
+                    <Grid Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="170" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                            <TextBlock Text="CONTACT" Style="{StaticResource FieldLabelText}" />
+                            <TextBox Style="{StaticResource FieldTextBox}"
+                                     Text="{Binding QuickContactName, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                            <TextBlock Text="EMAIL OR PHONE" Style="{StaticResource FieldLabelText}" />
+                            <TextBox Style="{StaticResource FieldTextBox}"
+                                     Text="{Binding QuickContactInfo, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Style="{StaticResource MutedText}" FontSize="11.5" Margin="0,6,0,0"
+                               Foreground="{StaticResource DangerBrush}"
+                               Text="A contact needs both a name and a way to reach them."
+                               Visibility="{Binding QuickContactIncomplete, Converter={StaticResource Truthy}}" />
+
+                    <!-- Row 3: what was sent, and the submit. -->
+                    <Grid Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <CheckBox Style="{StaticResource FieldCheckBox}"
+                                      Content="Resume submitted"
+                                      IsChecked="{Binding QuickResumeSubmitted}" />
+                            <CheckBox Style="{StaticResource FieldCheckBox}"
+                                      Margin="20,0,0,0"
+                                      Content="Cover letter submitted"
+                                      IsChecked="{Binding QuickCoverLetterSubmitted}" />
+                            <CheckBox Style="{StaticResource FieldCheckBox}"
+                                      Margin="20,0,0,0"
+                                      Content="Came from a job fair"
+                                      IsChecked="{Binding QuickFromJobFair}" />
+                        </StackPanel>
+
+                        <Button Grid.Column="1" Margin="16,0,0,0"
                                 Content="Add application"
                                 Style="{StaticResource PrimaryButton}"
-                                VerticalAlignment="Bottom"
                                 Command="{Binding QuickSubmitCommand}" />
                     </Grid>
                 </StackPanel>
@@ -98,7 +146,6 @@
                       Visibility="{Binding HasData, Converter={StaticResource Truthy}}">
             <Grid Margin="32,16,32,32">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
@@ -155,8 +202,7 @@
                                                 Series="{Binding OverTimeSeries}"
                                                 XAxes="{Binding OverTimeXAxes}"
                                                 YAxes="{Binding OverTimeYAxes}"
-                                                TooltipBackgroundPaint="{Binding TooltipBackgroundPaint}"
-                                                TooltipTextPaint="{Binding TooltipTextPaint}"
+                                                TooltipPosition="Hidden"
                                                 LegendPosition="Hidden" />
                         </StackPanel>
                     </Border>
@@ -172,38 +218,11 @@
                                           LegendPosition="Bottom"
                                           LegendTextPaint="{Binding LegendTextPaint}"
                                           LegendTextSize="11.5"
-                                          TooltipBackgroundPaint="{Binding TooltipBackgroundPaint}"
-                                          TooltipTextPaint="{Binding TooltipTextPaint}" />
+                                          TooltipPosition="Hidden" />
                         </StackPanel>
                     </Border>
                 </Grid>
 
-                <!-- ========== Stage durations ========== -->
-                <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,16,0,0">
-                    <StackPanel>
-                        <TextBlock Text="Average time in each stage" Style="{StaticResource SectionTitleText}" />
-                        <TextBlock Style="{StaticResource MutedText}" FontSize="12" Margin="0,3,0,0"
-                                   Text="How long applications sat in a stage before moving on" />
-
-                        <lvc:CartesianChart Height="220" Margin="0,16,0,0"
-                                            Series="{Binding StageDurationSeries}"
-                                            XAxes="{Binding StageDurationXAxes}"
-                                            YAxes="{Binding StageDurationYAxes}"
-                                            LegendPosition="Hidden"
-                                            TooltipBackgroundPaint="{Binding TooltipBackgroundPaint}"
-                                            TooltipTextPaint="{Binding TooltipTextPaint}"
-                                            Visibility="{Binding HasStageDurations, Converter={StaticResource Truthy}}" />
-
-                        <!-- One status change is not enough to measure anything, and an empty
-                             axis would read as "zero days" rather than "nothing to show yet". -->
-                        <TextBlock Style="{StaticResource MutedText}"
-                                   Margin="0,24,0,10"
-                                   TextAlignment="Center"
-                                   TextWrapping="Wrap"
-                                   Text="Move an application to its next stage and the timings start showing up here."
-                                   Visibility="{Binding HasStageDurations, Converter={StaticResource Truthy}, ConverterParameter=Invert}" />
-                    </StackPanel>
-                </Border>
             </Grid>
         </ScrollViewer>
 
@@ -231,13 +250,7 @@
                 <TextBlock Style="{StaticResource MutedText}"
                            Margin="0,8,0,0"
                            TextAlignment="Center" TextWrapping="Wrap"
-                           Text="Add an application in the box above and this page fills in with your rates, your pipeline, and how long each stage is taking." />
-
-                <Button Content="Open the full form"
-                        Style="{StaticResource SecondaryButton}"
-                        Margin="0,24,0,0"
-                        HorizontalAlignment="Center"
-                        Command="{Binding AddFirstCommand}" />
+                           Text="Add an application in the box above and this page fills in with your rates and your pipeline." />
             </StackPanel>
         </Border>
     </Grid>

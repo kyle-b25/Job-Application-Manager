@@ -1,20 +1,28 @@
 using System.ComponentModel.DataAnnotations;
 using JobAppManager.App.ViewModels;
 using JobAppManager.Core.Enums;
+using JobAppManager.TestSupport;
 using Xunit;
 
 namespace JobAppManager.App.Tests;
 
-/// <summary>The add/edit form: validation, the new-vs-edit split, child rows, and the rule that
-/// pipeline moves go through the repository so history is recorded.</summary>
+/// <summary>The edit form: validation, loading, child rows, and the rule that pipeline moves go
+/// through the repository so history is recorded.
+///
+/// The form only ever updates - applications are created from the dashboard's quick-submit box -
+/// so every test here starts from a row that already exists.</summary>
 public class ApplicationEditorViewModelTests : ViewModelTestBase
 {
-    private ApplicationEditorViewModel NewFilledEditor()
+    /// <summary>An editor sitting on a freshly seeded application, which is the only state the
+    /// form is ever reached in.</summary>
+    private async Task<ApplicationEditorViewModel> NewLoadedEditorAsync(
+        Func<ApplicationBuilder, ApplicationBuilder>? build = null)
     {
+        var seeded = await SeedAsync(build ?? (b => b
+            .At("Northwind Labs").For("Senior Backend Engineer")));
+
         var vm = NewEditorViewModel();
-        vm.LoadNew();
-        vm.CompanyName = "Northwind Labs";
-        vm.JobTitle = "Senior Backend Engineer";
+        await vm.LoadAsync(seeded.Id);
         return vm;
     }
 
@@ -78,62 +86,7 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
         Assert.Null(ApplicationEditorViewModel.ValidateDateApplied(date, context));
     }
 
-    [Fact]
-    public void NewApplication_DefaultsToTodayOnTheInjectedClock()
-    {
-        var vm = NewEditorViewModel();
-
-        Assert.Equal(Clock.Today, vm.DateApplied);
-
-        Clock.AdvanceDays(3);
-        vm.LoadNew();
-        Assert.Equal(Clock.Today, vm.DateApplied);
-    }
-
-    // ---------------- New vs edit ----------------
-
-    [Fact]
-    public void LoadNew_PresentsABlankFormInNewMode()
-    {
-        var vm = NewFilledEditor();
-
-        Assert.True(vm.IsNew);
-        Assert.Equal("Add application", vm.Title);
-        Assert.Equal("Add application", vm.SaveLabel);
-        Assert.False(vm.HasStatusHistory);
-    }
-
-    [Fact]
-    public async Task LoadNew_ClearsEverythingLeftOverFromAPreviousEdit()
-    {
-        var seeded = await SeedAsync(b => b
-            .At("Leftover Co").For("Engineer")
-            .WithUrl("https://leftover.example/1")
-            .WithNotes("Some notes")
-            .WithStatus(ApplicationStatus.Interview, interviewRound: 3)
-            .WithContact("Someone", "someone@example.com")
-            .WithResume().WithCoverLetter());
-
-        var vm = NewEditorViewModel();
-        await vm.LoadAsync(seeded.Id);
-        Assert.False(vm.IsNew);
-
-        vm.LoadNew();
-
-        // The editor is a singleton reused across navigations, so anything not reset here leaks
-        // into the next "Add New" - the user would see the previous company's contacts.
-        Assert.True(vm.IsNew);
-        Assert.Equal(string.Empty, vm.CompanyName);
-        Assert.Equal(string.Empty, vm.JobTitle);
-        Assert.Null(vm.JobUrl);
-        Assert.Null(vm.Notes);
-        Assert.Null(vm.InterviewRound);
-        Assert.Equal(ApplicationStatus.Applied, vm.Status);
-        Assert.False(vm.ResumeSubmitted);
-        Assert.False(vm.CoverLetterSubmitted);
-        Assert.Empty(vm.Contacts);
-        Assert.Empty(vm.StatusHistory);
-    }
+    // ---------------- Loading ----------------
 
     [Fact]
     public async Task Load_FillsEveryFieldAndTheTimelineNewestFirst()
@@ -150,8 +103,8 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
         var vm = NewEditorViewModel();
         await vm.LoadAsync(seeded.Id);
 
-        Assert.False(vm.IsNew);
         Assert.Equal("Edit application", vm.Title);
+        Assert.Equal("Save changes", vm.SaveLabel);
         Assert.Equal("Timeline Co", vm.CompanyName);
         Assert.Equal(ApplicationStatus.Interview, vm.Status);
 
@@ -179,15 +132,19 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
     [Fact]
     public async Task Save_WithMissingRequiredFields_WritesNothing()
     {
-        var vm = NewEditorViewModel();
-        vm.LoadNew();
+        var vm = await NewLoadedEditorAsync(b => b.At("Intact Co").For("Engineer"));
+
         vm.CompanyName = "";
         vm.JobTitle = "";
 
         await vm.SaveCommand.ExecuteAsync(null);
 
         Assert.True(vm.HasErrors);
-        Assert.Empty(await AllAsync());
+
+        // The stored row keeps the values it had rather than being blanked out.
+        var stored = Assert.Single(await AllAsync());
+        Assert.Equal("Intact Co", stored.CompanyName);
+        Assert.Equal("Engineer", stored.JobTitle);
 
         // It must also stay on the form rather than navigating away from unsaved work.
         Assert.Equal(0, Navigation.ApplicationsCount);
@@ -196,8 +153,8 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
     [Fact]
     public async Task Save_TrimsWhitespaceAndStoresBlankOptionalFieldsAsNull()
     {
-        var vm = NewEditorViewModel();
-        vm.LoadNew();
+        var vm = await NewLoadedEditorAsync(b => b.At("Before").WithNotes("Old notes"));
+
         vm.CompanyName = "  Spaced Co  ";
         vm.JobTitle = "  Engineer  ";
         vm.Location = "  Remote  ";
@@ -212,22 +169,6 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
 
         // Null rather than "   ", so the detail pane's "is there anything here?" checks work.
         Assert.Null(saved.Notes);
-    }
-
-    [Fact]
-    public async Task Save_OnANewApplication_SeedsExactlyOneHistoryEntry()
-    {
-        var vm = NewFilledEditor();
-        vm.Status = ApplicationStatus.Interview;
-
-        await vm.SaveCommand.ExecuteAsync(null);
-
-        var saved = Assert.Single(await AllAsync());
-        var reloaded = (await LoadAsync(saved.Id))!;
-
-        var entry = Assert.Single(reloaded.StatusHistory);
-        Assert.Equal(ApplicationStatus.Interview, entry.Status);
-        Assert.Equal(1, Navigation.ApplicationsCount);
     }
 
     [Fact]
@@ -271,8 +212,8 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
 
         var reloaded = (await LoadAsync(seeded.Id))!;
 
-        // Editing a field is not a pipeline move. A spurious entry here would corrupt every
-        // stage-duration average on the dashboard.
+        // Editing a field is not a pipeline move. A spurious entry here would inflate the
+        // interview and rejection rates, which are read off the history.
         Assert.Equal("Somewhere new", reloaded.Location);
         Assert.Single(reloaded.StatusHistory);
     }
@@ -334,7 +275,7 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
     [Fact]
     public async Task Save_DropsBlankChildRowsInsteadOfRefusingTheWholeSave()
     {
-        var vm = NewFilledEditor();
+        var vm = await NewLoadedEditorAsync();
 
         vm.AddContactCommand.Execute(null);   // left blank
 
@@ -355,7 +296,7 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
     [Fact]
     public async Task Save_RefusesAContactWithNoEmail()
     {
-        var vm = NewFilledEditor();
+        var vm = await NewLoadedEditorAsync();
 
         vm.AddContactCommand.Execute(null);
         vm.Contacts.Last().Name = "Dana Reed";
@@ -365,7 +306,11 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
         // A half-filled row is a mistake worth pointing at, unlike an entirely blank one.
         Assert.True(Dialogs.ErrorWasShown);
         Assert.Contains("Dana Reed", Dialogs.ErrorMessages[0]);
-        Assert.Empty(await AllAsync());
+
+        // And nothing is written: the whole save is refused, not just the offending row.
+        var saved = Assert.Single(await AllAsync());
+        Assert.Empty((await LoadAsync(saved.Id))!.Contacts);
+        Assert.Equal(0, Navigation.ApplicationsCount);
     }
 
     [Fact]
@@ -404,9 +349,9 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
     }
 
     [Fact]
-    public void RemoveCommands_IgnoreANullRow()
+    public async Task RemoveCommands_IgnoreANullRow()
     {
-        var vm = NewFilledEditor();
+        var vm = await NewLoadedEditorAsync();
         vm.AddContactCommand.Execute(null);
 
         // The command is bound with a CommandParameter that can be null while a row is being
@@ -417,12 +362,14 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
     }
 
     [Fact]
-    public void Cancel_GoesBackWithoutSaving()
+    public async Task Cancel_GoesBackWithoutSaving()
     {
-        var vm = NewFilledEditor();
+        var vm = await NewLoadedEditorAsync(b => b.At("Unchanged Co"));
 
+        vm.CompanyName = "Typed but abandoned";
         vm.CancelCommand.Execute(null);
 
         Assert.Equal(1, Navigation.ApplicationsCount);
+        Assert.Equal("Unchanged Co", Assert.Single(await AllAsync()).CompanyName);
     }
 }

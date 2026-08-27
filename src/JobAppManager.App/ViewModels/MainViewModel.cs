@@ -1,6 +1,8 @@
+using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JobAppManager.App.Services;
+using JobAppManager.Data;
 
 namespace JobAppManager.App.ViewModels;
 
@@ -10,27 +12,20 @@ public partial class MainViewModel : ObservableObject, INavigationService
     private readonly DashboardViewModel _dashboard;
     private readonly ApplicationsViewModel _applications;
     private readonly ApplicationEditorViewModel _editor;
+    private readonly IShellLauncher _shell;
 
     public MainViewModel(
         DashboardViewModel dashboard,
         ApplicationsViewModel applications,
-        ApplicationEditorViewModel editor)
+        ApplicationEditorViewModel editor,
+        IShellLauncher shell)
     {
         _dashboard = dashboard;
         _applications = applications;
         _editor = editor;
+        _shell = shell;
 
         _currentPage = _dashboard;
-
-        // The editor decides whether it is in "new" or "edit" mode asynchronously, after the
-        // shell has already switched to it, so the sidebar has to be told to re-check.
-        _editor.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName is nameof(ApplicationEditorViewModel.IsNew))
-            {
-                OnPropertyChanged(nameof(IsEditorSelected));
-            }
-        };
     }
 
     [ObservableProperty]
@@ -40,10 +35,9 @@ public partial class MainViewModel : ObservableObject, INavigationService
 
     public bool IsApplicationsSelected => CurrentPage == _applications;
 
-    /// <summary>Only a *new* application lights "Add New". Editing an existing record reached
-    /// from the list is not that section, and lighting it there would say the user is about to
-    /// create something when they are not.</summary>
-    public bool IsEditorSelected => CurrentPage == _editor && _editor.IsNew;
+    /// <summary>The editor is not a sidebar destination - it is only ever reached from a row -
+    /// so neither nav entry lights while it is showing.</summary>
+    public bool IsEditorSelected => CurrentPage == _editor;
 
     partial void OnCurrentPageChanged(object value)
     {
@@ -66,18 +60,17 @@ public partial class MainViewModel : ObservableObject, INavigationService
         _ = _applications.ActivateAsync();
     }
 
-    [RelayCommand]
-    public void GoToNewApplication()
-    {
-        _editor.LoadNew();
-        CurrentPage = _editor;
-    }
-
     public void GoToEditApplication(int applicationId)
     {
         CurrentPage = _editor;
         _ = _editor.LoadAsync(applicationId);
     }
+
+    /// <summary>Opens the folder holding the SQLite file - the folder, not the file itself, so
+    /// the user lands somewhere they can copy or back it up from.</summary>
+    [RelayCommand]
+    public void OpenDataFolder() =>
+        _shell.OpenFolder(Path.GetDirectoryName(DbPathProvider.GetDefaultDatabasePath())!);
 
     /// <summary>Loads the landing page once the window is up.</summary>
     public Task StartAsync() => _dashboard.ActivateAsync();

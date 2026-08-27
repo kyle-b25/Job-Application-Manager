@@ -19,8 +19,10 @@ public class DashboardViewModelTests : ViewModelTestBase
         Assert.False(vm.HasData);
         Assert.Null(vm.Subtitle);
         Assert.Empty(vm.StatusSeries);
-        Assert.Empty(vm.StageDurationSeries);
-        Assert.False(vm.HasStageDurations);
+
+        // The over-time series always exists; with no months to draw it is an empty axis rather
+        // than a chart of zeros.
+        Assert.Empty(Assert.Single(vm.OverTimeXAxes).Labels!);
     }
 
     [Fact]
@@ -108,34 +110,6 @@ public class DashboardViewModelTests : ViewModelTestBase
         Assert.Equal("Sep 26", axis.Labels[^1]);
     }
 
-    [Fact]
-    public async Task StageDurations_AppearOnlyOnceSomethingHasActuallyMoved()
-    {
-        var seeded = await SeedAsync(b => b
-            .At("Alpha").AppliedOn(2026, 9, 1).WithStatus(ApplicationStatus.Applied));
-
-        var vm = NewDashboardViewModel();
-        await vm.ActivateAsync();
-
-        // One history entry and no transition: nothing to average, so the card shows a sentence
-        // rather than an axis of zeros.
-        Assert.False(vm.HasStageDurations);
-        Assert.Empty(vm.StageDurationSeries);
-
-        Clock.AdvanceDays(9);
-        await using (var scope = Repositories.Create())
-        {
-            await scope.Repository.ChangeStatusAsync(seeded.Id, ApplicationStatus.Interview);
-        }
-
-        await vm.ActivateAsync();
-
-        Assert.True(vm.HasStageDurations);
-        var series = Assert.Single(vm.StageDurationSeries);
-        Assert.Equal(new[] { 9d }, ((IEnumerable<double>)series.Values!).ToArray());
-        Assert.Equal(new[] { "Applied" }, Assert.Single(vm.StageDurationYAxes).Labels);
-    }
-
     // ---------------- Quick submit ----------------
 
     [Fact]
@@ -166,8 +140,8 @@ public class DashboardViewModelTests : ViewModelTestBase
         Assert.Equal(ApplicationStatus.Applied, entry.Status);
 
         // Nothing navigates: the point of the box is that you stay on the dashboard.
-        Assert.Equal(0, Navigation.NewApplicationCount);
         Assert.Equal(0, Navigation.ApplicationsCount);
+        Assert.Empty(Navigation.EditedIds);
     }
 
     [Fact]
@@ -203,6 +177,11 @@ public class DashboardViewModelTests : ViewModelTestBase
         vm.QuickJobTitle = "Engineer";
         vm.QuickLocation = "Remote";
         vm.QuickInterest = InterestLevel.Red;
+        vm.QuickResumeSubmitted = true;
+        vm.QuickCoverLetterSubmitted = true;
+        vm.QuickFromJobFair = true;
+        vm.QuickContactName = "Dana Reed";
+        vm.QuickContactInfo = "dana@quick.co";
 
         await vm.QuickSubmitCommand.ExecuteAsync(null);
 
@@ -211,6 +190,11 @@ public class DashboardViewModelTests : ViewModelTestBase
         Assert.Equal(string.Empty, vm.QuickJobTitle);
         Assert.Equal(string.Empty, vm.QuickLocation);
         Assert.Equal(InterestLevel.Yellow, vm.QuickInterest);
+        Assert.False(vm.QuickResumeSubmitted);
+        Assert.False(vm.QuickCoverLetterSubmitted);
+        Assert.False(vm.QuickFromJobFair);
+        Assert.Equal(string.Empty, vm.QuickContactName);
+        Assert.Equal(string.Empty, vm.QuickContactInfo);
 
         // And the page recomputes in place rather than waiting for a navigation.
         Assert.Equal(1, vm.TotalApplications);
@@ -222,6 +206,89 @@ public class DashboardViewModelTests : ViewModelTestBase
     }
 
     [Fact]
+    public async Task QuickSubmit_StoresTheSubmittedFlagsAndTheJobFairFlag()
+    {
+        var vm = NewDashboardViewModel();
+        await vm.ActivateAsync();
+
+        vm.QuickCompany = "Quick Co";
+        vm.QuickJobTitle = "Engineer";
+        vm.QuickResumeSubmitted = true;
+        vm.QuickFromJobFair = true;
+
+        await vm.QuickSubmitCommand.ExecuteAsync(null);
+
+        var saved = Assert.Single(await AllAsync());
+        Assert.True(saved.ResumeSubmitted);
+        Assert.True(saved.FromJobFair);
+
+        // Left unticked, and so left false rather than quietly defaulted to true.
+        Assert.False(saved.CoverLetterSubmitted);
+    }
+
+    [Fact]
+    public async Task QuickSubmit_StoresTheContactWhenOneIsGiven()
+    {
+        var vm = NewDashboardViewModel();
+        await vm.ActivateAsync();
+
+        vm.QuickCompany = "Quick Co";
+        vm.QuickJobTitle = "Engineer";
+        vm.QuickContactName = "  Dana Reed  ";
+        vm.QuickContactInfo = "  dana@quick.co  ";
+
+        await vm.QuickSubmitCommand.ExecuteAsync(null);
+
+        var saved = Assert.Single(await AllAsync());
+        var reloaded = (await LoadAsync(saved.Id))!;
+
+        var contact = Assert.Single(reloaded.Contacts);
+        Assert.Equal("Dana Reed", contact.Name);
+        Assert.Equal("dana@quick.co", contact.Email);
+    }
+
+    [Fact]
+    public async Task QuickSubmit_LeavesTheContactsEmptyWhenNoNameIsGiven()
+    {
+        var vm = NewDashboardViewModel();
+        await vm.ActivateAsync();
+
+        vm.QuickCompany = "Quick Co";
+        vm.QuickJobTitle = "Engineer";
+
+        await vm.QuickSubmitCommand.ExecuteAsync(null);
+
+        var saved = Assert.Single(await AllAsync());
+        Assert.Empty((await LoadAsync(saved.Id))!.Contacts);
+    }
+
+    [Fact]
+    public async Task QuickSubmit_IsBlockedWhileTheContactIsHalfFilled()
+    {
+        var vm = NewDashboardViewModel();
+        await vm.ActivateAsync();
+
+        vm.QuickCompany = "Quick Co";
+        vm.QuickJobTitle = "Engineer";
+        Assert.True(vm.QuickSubmitCommand.CanExecute(null));
+
+        // Contact.Email is required by the schema, so a name on its own cannot be saved -
+        // and dropping the name the user just typed would be worse than refusing.
+        vm.QuickContactName = "Dana Reed";
+        Assert.True(vm.QuickContactIncomplete);
+        Assert.False(vm.QuickSubmitCommand.CanExecute(null));
+
+        vm.QuickContactInfo = "dana@quick.co";
+        Assert.False(vm.QuickContactIncomplete);
+        Assert.True(vm.QuickSubmitCommand.CanExecute(null));
+
+        // The other half alone is refused just the same.
+        vm.QuickContactName = string.Empty;
+        Assert.True(vm.QuickContactIncomplete);
+        Assert.False(vm.QuickSubmitCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void Title_IsTheStaticPageName()
     {
         Clock.Set(new DateTimeOffset(2026, 9, 15, 6, 0, 0, TimeSpan.Zero));
@@ -230,16 +297,6 @@ public class DashboardViewModelTests : ViewModelTestBase
         // No greeting any more, so the header must not move with the clock.
         Clock.Set(new DateTimeOffset(2026, 9, 15, 22, 0, 0, TimeSpan.Zero));
         Assert.Equal("Dashboard", NewDashboardViewModel().Title);
-    }
-
-    [Fact]
-    public void AddFirst_NavigatesToTheEditor()
-    {
-        var vm = NewDashboardViewModel();
-
-        vm.AddFirstCommand.Execute(null);
-
-        Assert.Equal(1, Navigation.NewApplicationCount);
     }
 
     [Fact]

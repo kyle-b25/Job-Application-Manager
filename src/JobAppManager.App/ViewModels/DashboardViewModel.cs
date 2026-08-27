@@ -15,6 +15,7 @@ using SkiaSharp;
 
 // System.Windows.Application is already in scope here for the resource lookups the charts do,
 // so the entity gets an alias rather than an ambiguous import.
+using Contact = JobAppManager.Core.Entities.Contact;
 using JobApplication = JobAppManager.Core.Entities.Application;
 
 namespace JobAppManager.App.ViewModels;
@@ -22,16 +23,13 @@ namespace JobAppManager.App.ViewModels;
 public partial class DashboardViewModel : PageViewModel
 {
     private readonly RepositoryFactory _repositories;
-    private readonly INavigationService _navigation;
     private readonly TimeProvider _timeProvider;
 
     public DashboardViewModel(
         RepositoryFactory repositories,
-        INavigationService navigation,
         TimeProvider? timeProvider = null)
     {
         _repositories = repositories;
-        _navigation = navigation;
         _timeProvider = timeProvider ?? TimeProvider.System;
 
         InterestLevels = Enum.GetValues<InterestLevel>();
@@ -66,11 +64,40 @@ public partial class DashboardViewModel : PageViewModel
     [ObservableProperty]
     private InterestLevel _quickInterest = InterestLevel.Yellow;
 
+    [ObservableProperty]
+    private bool _quickResumeSubmitted;
+
+    [ObservableProperty]
+    private bool _quickCoverLetterSubmitted;
+
+    [ObservableProperty]
+    private bool _quickFromJobFair;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanQuickSubmit))]
+    [NotifyPropertyChangedFor(nameof(QuickContactIncomplete))]
+    [NotifyCanExecuteChangedFor(nameof(QuickSubmitCommand))]
+    private string _quickContactName = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanQuickSubmit))]
+    [NotifyPropertyChangedFor(nameof(QuickContactIncomplete))]
+    [NotifyCanExecuteChangedFor(nameof(QuickSubmitCommand))]
+    private string _quickContactInfo = string.Empty;
+
+    /// <summary>Half a contact. Contact.Email is required by the schema, so a name with no way
+    /// to reach the person cannot be stored - and quietly dropping the name the user just typed
+    /// would be worse than saying so.</summary>
+    public bool QuickContactIncomplete =>
+        string.IsNullOrWhiteSpace(QuickContactName) != string.IsNullOrWhiteSpace(QuickContactInfo);
+
     /// <summary>Company and title are the two fields the entity actually requires; everything
-    /// else on the form has a sensible default, which is the point of a quick submit.</summary>
+    /// else on the form has a sensible default, which is the point of a quick submit. The one
+    /// extra rule is the contact pair, which has to be wholly filled in or wholly blank.</summary>
     public bool CanQuickSubmit =>
         !string.IsNullOrWhiteSpace(QuickCompany)
         && !string.IsNullOrWhiteSpace(QuickJobTitle)
+        && !QuickContactIncomplete
         && !IsBusy;
 
     /// <summary>Adds an application dated today, straight from the dashboard. It goes in as
@@ -86,8 +113,22 @@ public partial class DashboardViewModel : PageViewModel
             Location = QuickLocation?.Trim() ?? string.Empty,
             InterestLevel = QuickInterest,
             DateApplied = Today,
-            Status = ApplicationStatus.Applied
+            Status = ApplicationStatus.Applied,
+            ResumeSubmitted = QuickResumeSubmitted,
+            CoverLetterSubmitted = QuickCoverLetterSubmitted,
+            FromJobFair = QuickFromJobFair
         };
+
+        // CanQuickSubmit has already ruled out a half-filled pair, so a name here means there is
+        // something to reach them by as well. EF inserts the child along with the root.
+        if (!string.IsNullOrWhiteSpace(QuickContactName))
+        {
+            application.Contacts.Add(new Contact
+            {
+                Name = QuickContactName.Trim(),
+                Email = QuickContactInfo.Trim()
+            });
+        }
 
         await using (var scope = _repositories.Create())
         {
@@ -98,9 +139,14 @@ public partial class DashboardViewModel : PageViewModel
         QuickJobTitle = string.Empty;
         QuickLocation = string.Empty;
         QuickInterest = InterestLevel.Yellow;
+        QuickResumeSubmitted = false;
+        QuickCoverLetterSubmitted = false;
+        QuickFromJobFair = false;
+        QuickContactName = string.Empty;
+        QuickContactInfo = string.Empty;
 
-        // Re-read rather than incrementing by hand: the charts, the rates, and the stage
-        // breakdown all have to move together, and the repository is the only thing that knows how.
+        // Re-read rather than incrementing by hand: the charts and the rates all have to move
+        // together, and the repository is the only thing that knows how.
         await ActivateAsync();
     }
 
@@ -134,20 +180,6 @@ public partial class DashboardViewModel : PageViewModel
     [ObservableProperty]
     private ISeries[] _statusSeries = Array.Empty<ISeries>();
 
-    [ObservableProperty]
-    private ISeries[] _stageDurationSeries = Array.Empty<ISeries>();
-
-    [ObservableProperty]
-    private Axis[] _stageDurationXAxes = Array.Empty<Axis>();
-
-    [ObservableProperty]
-    private Axis[] _stageDurationYAxes = Array.Empty<Axis>();
-
-    /// <summary>True until at least one status transition exists anywhere. Without one there is
-    /// no elapsed time to average, and an empty bar chart says less than a sentence does.</summary>
-    [ObservableProperty]
-    private bool _hasStageDurations;
-
     public bool IsEmpty => TotalApplications == 0 && !IsBusy;
 
     public bool HasData => TotalApplications > 0;
@@ -174,7 +206,6 @@ public partial class DashboardViewModel : PageViewModel
 
             BuildOverTimeChart(stats);
             BuildStatusChart(stats);
-            BuildStageDurationChart(stats);
         }
         finally
         {
@@ -186,11 +217,6 @@ public partial class DashboardViewModel : PageViewModel
             QuickSubmitCommand.NotifyCanExecuteChanged();
         }
     }
-
-    /// <summary>The empty state offers the full editor for anyone who wants more than the four
-    /// fields the quick-submit box above it asks for.</summary>
-    [RelayCommand]
-    private void AddFirst() => _navigation.GoToNewApplication();
 
     // ---------------- Charts ----------------
 
@@ -211,7 +237,10 @@ public partial class DashboardViewModel : PageViewModel
                 Stroke = null,
                 MaxBarWidth = 44,
                 Rx = 5,
-                Ry = 5
+                Ry = 5,
+                // The axis already names the month and the height already is the count, so a
+                // tooltip repeating both only follows the cursor around.
+                IsHoverable = false
             }
         };
 
@@ -266,74 +295,29 @@ public partial class DashboardViewModel : PageViewModel
                 Values = new[] { kvp.Value },
                 Fill = new SolidColorPaint(StatusColor(kvp.Key)),
                 Stroke = null,
-                InnerRadius = 58,
+                // A solid pie, and one that holds still: the counts are printed on the slices
+                // and the stages are named in the legend, so hover has nothing left to add and
+                // a slice sliding out from under the cursor is only distracting.
+                InnerRadius = 0,
+                HoverPushout = 0,
+                IsHoverable = false,
                 DataLabelsPaint = new SolidColorPaint(Resource("TextPrimaryBrush")),
                 DataLabelsSize = 12,
                 DataLabelsPosition = PolarLabelsPosition.Outer,
-                DataLabelsFormatter = point => $"{point.Model}",
-                ToolTipLabelFormatter = point =>
-                    $"{EnumDisplayNameConverter.Humanize(kvp.Key)}: {point.Model}"
+                DataLabelsFormatter = point => $"{point.Model}"
             })
             .ToArray();
-    }
-
-    private void BuildStageDurationChart(JobHuntStatistics stats)
-    {
-        var stages = stats.AverageDaysInStage.OrderBy(s => s.Stage).ToList();
-
-        HasStageDurations = stages.Count > 0;
-
-        if (!HasStageDurations)
-        {
-            StageDurationSeries = Array.Empty<ISeries>();
-            StageDurationXAxes = Array.Empty<Axis>();
-            StageDurationYAxes = Array.Empty<Axis>();
-            return;
-        }
-
-        StageDurationSeries = new ISeries[]
-        {
-            new RowSeries<double>
-            {
-                Name = "Average days",
-                Values = stages.Select(s => Math.Round(s.AverageDays, 1)).ToArray(),
-                Fill = new SolidColorPaint(Accent()),
-                Stroke = null,
-                MaxBarWidth = 26,
-                Rx = 5,
-                Ry = 5,
-                DataLabelsPaint = new SolidColorPaint(Resource("TextPrimaryBrush")),
-                DataLabelsSize = 11,
-                DataLabelsPosition = DataLabelsPosition.End,
-                DataLabelsFormatter = point => $"{point.Model:0.#} d"
-            }
-        };
-
-        // Rows are horizontal, so the categories live on the Y axis and the values on the X.
-        StageDurationYAxes = new[]
-        {
-            NewAxis(stages.Select(s => EnumDisplayNameConverter.Humanize(s.Stage)).ToArray())
-        };
-
-        StageDurationXAxes = new[] { NewValueAxis() };
     }
 
     // ---------------- Chart theming ----------------
 
     // Bound by the chart controls themselves. Lazy, because Application.Current.Resources is not
-    // populated yet while the DI container is being built.
+    // populated yet while the DI container is being built. Neither chart shows a tooltip any
+    // more, so the legend is the only paint left to theme.
     private SolidColorPaint? _legendTextPaint;
-    private SolidColorPaint? _tooltipTextPaint;
-    private SolidColorPaint? _tooltipBackgroundPaint;
 
     public SolidColorPaint LegendTextPaint =>
         _legendTextPaint ??= new SolidColorPaint(Resource("TextMutedBrush"));
-
-    public SolidColorPaint TooltipTextPaint =>
-        _tooltipTextPaint ??= new SolidColorPaint(Resource("TextPrimaryBrush"));
-
-    public SolidColorPaint TooltipBackgroundPaint =>
-        _tooltipBackgroundPaint ??= new SolidColorPaint(Resource("SurfaceRaisedBrush"));
 
 
     // LiveCharts defaults are drawn for a white page: black labels, black separators, a white

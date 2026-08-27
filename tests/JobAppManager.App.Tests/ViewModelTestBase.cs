@@ -27,6 +27,7 @@ public abstract class ViewModelTestBase : IDisposable
         Repositories = new RepositoryFactory(() => Fixture.CreateContext(), Clock);
         Navigation = new FakeNavigationService();
         Dialogs = new FakeDialogService();
+        ShellLauncher = new FakeShellLauncher();
     }
 
     protected FixedClock Clock { get; }
@@ -39,6 +40,8 @@ public abstract class ViewModelTestBase : IDisposable
 
     protected FakeDialogService Dialogs { get; }
 
+    protected FakeShellLauncher ShellLauncher { get; }
+
     protected ApplicationsViewModel NewApplicationsViewModel() =>
         new(Repositories, Navigation, Dialogs);
 
@@ -46,7 +49,7 @@ public abstract class ViewModelTestBase : IDisposable
         new(Repositories, Navigation, Dialogs, Clock);
 
     protected DashboardViewModel NewDashboardViewModel() =>
-        new(Repositories, Navigation, Clock);
+        new(Repositories, Clock);
 
     /// <summary>Writes an application straight through the repository, bypassing the ViewModels.</summary>
     protected async Task<Application> SeedAsync(Application application)
