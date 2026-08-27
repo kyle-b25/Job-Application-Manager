@@ -59,12 +59,16 @@ public partial class DashboardViewModel : PageViewModel
     private string _quickJobTitle = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanQuickSubmit))]
+    [NotifyCanExecuteChangedFor(nameof(QuickSubmitCommand))]
     private string _quickLocation = string.Empty;
 
     [ObservableProperty]
     private InterestLevel _quickInterest = InterestLevel.Yellow;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanQuickSubmit))]
+    [NotifyCanExecuteChangedFor(nameof(QuickSubmitCommand))]
     private bool _quickResumeSubmitted;
 
     [ObservableProperty]
@@ -91,12 +95,14 @@ public partial class DashboardViewModel : PageViewModel
     public bool QuickContactIncomplete =>
         string.IsNullOrWhiteSpace(QuickContactName) != string.IsNullOrWhiteSpace(QuickContactInfo);
 
-    /// <summary>Company and title are the two fields the entity actually requires; everything
-    /// else on the form has a sensible default, which is the point of a quick submit. The one
-    /// extra rule is the contact pair, which has to be wholly filled in or wholly blank.</summary>
+    /// <summary>Company, job title, location and a submitted resume are all required - an
+    /// application without them is not one worth tracking. The remaining rule is the contact
+    /// pair, which has to be wholly filled in or wholly blank.</summary>
     public bool CanQuickSubmit =>
         !string.IsNullOrWhiteSpace(QuickCompany)
         && !string.IsNullOrWhiteSpace(QuickJobTitle)
+        && !string.IsNullOrWhiteSpace(QuickLocation)
+        && QuickResumeSubmitted
         && !QuickContactIncomplete
         && !IsBusy;
 

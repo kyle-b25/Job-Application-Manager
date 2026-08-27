@@ -145,7 +145,7 @@ public class DashboardViewModelTests : ViewModelTestBase
     }
 
     [Fact]
-    public async Task QuickSubmit_IsDisabledUntilCompanyAndTitleAreFilled()
+    public async Task QuickSubmit_IsDisabledUntilTheRequiredFieldsAreFilled()
     {
         var vm = NewDashboardViewModel();
         await vm.ActivateAsync();
@@ -157,7 +157,18 @@ public class DashboardViewModelTests : ViewModelTestBase
         Assert.False(vm.QuickSubmitCommand.CanExecute(null));
 
         vm.QuickJobTitle = "Engineer";
+        Assert.False(vm.QuickSubmitCommand.CanExecute(null));
+
+        vm.QuickLocation = "Remote";
+        Assert.False(vm.QuickSubmitCommand.CanExecute(null));
+
+        // The resume is required too - an application with nothing sent is not one.
+        vm.QuickResumeSubmitted = true;
         Assert.True(vm.QuickSubmitCommand.CanExecute(null));
+
+        vm.QuickResumeSubmitted = false;
+        Assert.False(vm.QuickSubmitCommand.CanExecute(null));
+        vm.QuickResumeSubmitted = true;
 
         // Whitespace is not a company name; the entity requires a real one.
         vm.QuickCompany = "   ";
@@ -213,6 +224,7 @@ public class DashboardViewModelTests : ViewModelTestBase
 
         vm.QuickCompany = "Quick Co";
         vm.QuickJobTitle = "Engineer";
+        vm.QuickLocation = "Remote";
         vm.QuickResumeSubmitted = true;
         vm.QuickFromJobFair = true;
 
@@ -234,6 +246,8 @@ public class DashboardViewModelTests : ViewModelTestBase
 
         vm.QuickCompany = "Quick Co";
         vm.QuickJobTitle = "Engineer";
+        vm.QuickLocation = "Remote";
+        vm.QuickResumeSubmitted = true;
         vm.QuickContactName = "  Dana Reed  ";
         vm.QuickContactInfo = "  dana@quick.co  ";
 
@@ -255,6 +269,8 @@ public class DashboardViewModelTests : ViewModelTestBase
 
         vm.QuickCompany = "Quick Co";
         vm.QuickJobTitle = "Engineer";
+        vm.QuickLocation = "Remote";
+        vm.QuickResumeSubmitted = true;
 
         await vm.QuickSubmitCommand.ExecuteAsync(null);
 
@@ -270,6 +286,8 @@ public class DashboardViewModelTests : ViewModelTestBase
 
         vm.QuickCompany = "Quick Co";
         vm.QuickJobTitle = "Engineer";
+        vm.QuickLocation = "Remote";
+        vm.QuickResumeSubmitted = true;
         Assert.True(vm.QuickSubmitCommand.CanExecute(null));
 
         // Contact.Email is required by the schema, so a name on its own cannot be saved -

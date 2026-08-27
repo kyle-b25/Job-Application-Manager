@@ -34,7 +34,7 @@
                 <StackPanel>
                     <TextBlock Text="Submit an application" Style="{StaticResource SectionTitleText}" />
                     <TextBlock Style="{StaticResource MutedText}" FontSize="12" Margin="0,3,0,14"
-                               Text="Logged as Applied, dated today. This is the only place applications are created - open a row later to fill in the rest." />
+                               Text="Logged as Applied, dated today. Fields marked * are required. This is the only place applications are created - open a row later to fill in the rest." />
 
                     <!-- Row 1: the identity of the role. -->
                     <Grid>
@@ -46,19 +46,19 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                            <TextBlock Text="COMPANY" Style="{StaticResource FieldLabelText}" />
+                            <TextBlock Text="COMPANY *" Style="{StaticResource FieldLabelText}" />
                             <TextBox Style="{StaticResource FieldTextBox}"
                                      Text="{Binding QuickCompany, UpdateSourceTrigger=PropertyChanged}" />
                         </StackPanel>
 
                         <StackPanel Grid.Column="1" Margin="8,0">
-                            <TextBlock Text="JOB TITLE" Style="{StaticResource FieldLabelText}" />
+                            <TextBlock Text="JOB TITLE *" Style="{StaticResource FieldLabelText}" />
                             <TextBox Style="{StaticResource FieldTextBox}"
                                      Text="{Binding QuickJobTitle, UpdateSourceTrigger=PropertyChanged}" />
                         </StackPanel>
 
                         <StackPanel Grid.Column="2" Margin="8,0">
-                            <TextBlock Text="LOCATION" Style="{StaticResource FieldLabelText}" />
+                            <TextBlock Text="LOCATION *" Style="{StaticResource FieldLabelText}" />
                             <TextBox Style="{StaticResource FieldTextBox}"
                                      Text="{Binding QuickLocation, UpdateSourceTrigger=PropertyChanged}" />
                         </StackPanel>
@@ -100,7 +100,7 @@
                         </StackPanel>
 
                         <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                            <TextBlock Text="EMAIL OR PHONE" Style="{StaticResource FieldLabelText}" />
+                            <TextBlock Text="CONTACT'S EMAIL OR PHONE" Style="{StaticResource FieldLabelText}" />
                             <TextBox Style="{StaticResource FieldTextBox}"
                                      Text="{Binding QuickContactInfo, UpdateSourceTrigger=PropertyChanged}" />
                         </StackPanel>
@@ -120,7 +120,7 @@
 
                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                             <CheckBox Style="{StaticResource FieldCheckBox}"
-                                      Content="Resume submitted"
+                                      Content="Resume submitted *"
                                       IsChecked="{Binding QuickResumeSubmitted}" />
                             <CheckBox Style="{StaticResource FieldCheckBox}"
                                       Margin="20,0,0,0"
