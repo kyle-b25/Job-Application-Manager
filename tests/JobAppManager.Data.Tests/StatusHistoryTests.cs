@@ -36,10 +36,10 @@ public class StatusHistoryTests : IDisposable
     [Fact]
     public async Task Add_SeedsHistoryWithTheStartingStatus()
     {
-        var id = await AddAsync(ApplicationStatus.Wishlist);
+        var id = await AddAsync(ApplicationStatus.Interview);
 
         var entry = Assert.Single(await HistoryAsync(id));
-        Assert.Equal(ApplicationStatus.Wishlist, entry.Status);
+        Assert.Equal(ApplicationStatus.Interview, entry.Status);
         Assert.NotEqual(default, entry.ChangedUtc);
     }
 
@@ -82,25 +82,25 @@ public class StatusHistoryTests : IDisposable
 
         await using (var context = _fixture.CreateContext())
         {
-            await new ApplicationRepository(context).ChangeStatusAsync(id, ApplicationStatus.Offer);
+            await new ApplicationRepository(context).ChangeStatusAsync(id, ApplicationStatus.Rejected);
         }
 
         await using (var context = _fixture.CreateContext())
         {
             var loaded = await new ApplicationRepository(context).GetByIdAsync(id);
-            Assert.Equal(ApplicationStatus.Offer, loaded!.Status);
+            Assert.Equal(ApplicationStatus.Rejected, loaded!.Status);
             Assert.Equal(2, loaded.StatusHistory.Count);
         }
     }
 
     [Fact]
-    public async Task ChangeStatus_AwayFromInterview_ClearsTheRoundNumber()
+    public async Task ChangeStatus_AwayFromInterview_ClearsTheRoundNumberAndTheInterviewDate()
     {
         int id;
         await using (var context = _fixture.CreateContext())
         {
             var saved = await new ApplicationRepository(context).AddAsync(TestData.FullApplication());
-            id = saved.Id;   // FullApplication is Interview, round 2
+            id = saved.Id;   // FullApplication is Interview, round 2, with an interview date
         }
 
         await using (var context = _fixture.CreateContext())
@@ -112,6 +112,7 @@ public class StatusHistoryTests : IDisposable
         {
             var loaded = await new ApplicationRepository(context).GetByIdAsync(id);
             Assert.Null(loaded!.InterviewRound);
+            Assert.Null(loaded.InterviewDate);
         }
     }
 
@@ -173,7 +174,7 @@ public class StatusHistoryTests : IDisposable
         await using (var context = _fixture.CreateContext())
         {
             await new ApplicationRepository(context)
-                .ChangeStatusAsync(id, ApplicationStatus.PhoneScreen);
+                .ChangeStatusAsync(id, ApplicationStatus.Interview);
         }
 
         var history = await HistoryAsync(id);
@@ -187,7 +188,7 @@ public class StatusHistoryTests : IDisposable
     {
         await using var context = _fixture.CreateContext();
         Assert.False(await new ApplicationRepository(context)
-            .ChangeStatusAsync(4242, ApplicationStatus.Offer));
+            .ChangeStatusAsync(4242, ApplicationStatus.Rejected));
     }
 
     [Fact]
@@ -208,13 +209,13 @@ public class StatusHistoryTests : IDisposable
     [Fact]
     public async Task History_SurvivesContextRecreation()
     {
-        var id = await AddAsync(ApplicationStatus.Wishlist);
+        var id = await AddAsync(ApplicationStatus.Applied);
 
         await using (var context = _fixture.CreateContext())
         {
             var repository = new ApplicationRepository(context);
-            await repository.ChangeStatusAsync(id, ApplicationStatus.Applied);
-            await repository.ChangeStatusAsync(id, ApplicationStatus.PhoneScreen);
+            await repository.ChangeStatusAsync(id, ApplicationStatus.Interview);
+            await repository.ChangeStatusAsync(id, ApplicationStatus.Rejected);
         }
 
         // A brand new context over the same file - the only way to prove it reached the disk.
@@ -225,9 +226,9 @@ public class StatusHistoryTests : IDisposable
             Assert.Equal(
                 new[]
                 {
-                    ApplicationStatus.Wishlist,
                     ApplicationStatus.Applied,
-                    ApplicationStatus.PhoneScreen
+                    ApplicationStatus.Interview,
+                    ApplicationStatus.Rejected
                 },
                 loaded!.StatusHistory.Select(s => s.Status));
         }

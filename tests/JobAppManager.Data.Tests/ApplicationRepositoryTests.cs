@@ -308,7 +308,7 @@ public class ApplicationRepositoryTests : IDisposable
             // The list page shows no child data, so paying to load it on every keystroke would
             // be waste. The interface documents this; nothing checked it.
             var application = Assert.Single(results);
-            Assert.Empty(application.SubmittedItems);
+            Assert.Empty(application.StatusHistory);
             Assert.Empty(application.Contacts);
             Assert.Empty(application.StatusHistory);
         }

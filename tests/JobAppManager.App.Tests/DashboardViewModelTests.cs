@@ -28,19 +28,19 @@ public class DashboardViewModelTests : ViewModelTestBase
     {
         var interviewedThenRejected = await SeedAsync(b => b
             .At("Alpha").AppliedOn(2026, 9, 1).WithStatus(ApplicationStatus.Applied));
-        var offered = await SeedAsync(b => b
+        var interviewing = await SeedAsync(b => b
             .At("Beta").AppliedOn(2026, 9, 2).WithStatus(ApplicationStatus.Applied));
         await SeedAsync(b => b
             .At("Gamma").AppliedOn(2026, 9, 3).WithStatus(ApplicationStatus.Applied));
         await SeedAsync(b => b
-            .At("Delta").AppliedOn(2026, 9, 4).WithStatus(ApplicationStatus.Wishlist));
+            .At("Delta").AppliedOn(2026, 9, 4).WithStatus(ApplicationStatus.Applied));
 
         await using (var scope = Repositories.Create())
         {
             Clock.AdvanceDays(3);
             await scope.Repository.ChangeStatusAsync(interviewedThenRejected.Id, ApplicationStatus.Interview);
             await scope.Repository.ChangeStatusAsync(interviewedThenRejected.Id, ApplicationStatus.Rejected);
-            await scope.Repository.ChangeStatusAsync(offered.Id, ApplicationStatus.Offer);
+            await scope.Repository.ChangeStatusAsync(interviewing.Id, ApplicationStatus.Interview);
         }
 
         var vm = NewDashboardViewModel();
@@ -48,11 +48,12 @@ public class DashboardViewModelTests : ViewModelTestBase
 
         Assert.True(vm.HasData);
         Assert.Equal(4, vm.TotalApplications);
-        Assert.Equal(3, vm.ActiveApplications);   // Rejected is out; Wishlist still counts as active
+        Assert.Equal(3, vm.ActiveApplications);   // only the rejected one is out
 
-        // 3 submitted, 2 of them interviewed or better, 1 offered.
-        Assert.Equal(2d / 3d, vm.InterviewRate, 6);
-        Assert.Equal(1d / 3d, vm.OfferRate, 6);
+        // 4 applications; 2 of them reached Interview, 1 reached Rejected. Alpha is in both
+        // numerators - it interviewed and then got rejected, and only the history shows that.
+        Assert.Equal(2d / 4d, vm.InterviewRate, 6);
+        Assert.Equal(1d / 4d, vm.RejectionRate, 6);
         Assert.Equal("3 still in play out of 4 tracked.", vm.Subtitle);
     }
 
@@ -66,7 +67,7 @@ public class DashboardViewModelTests : ViewModelTestBase
         var vm = NewDashboardViewModel();
         await vm.ActivateAsync();
 
-        // Two occupied stages out of seven: an empty slice is invisible but still takes a legend
+        // Two occupied stages out of three: an empty slice is invisible but still takes a legend
         // entry, so the chart only gets the stages that exist.
         Assert.Equal(2, vm.StatusSeries.Length);
         Assert.Equal(
@@ -124,7 +125,7 @@ public class DashboardViewModelTests : ViewModelTestBase
         Clock.AdvanceDays(9);
         await using (var scope = Repositories.Create())
         {
-            await scope.Repository.ChangeStatusAsync(seeded.Id, ApplicationStatus.PhoneScreen);
+            await scope.Repository.ChangeStatusAsync(seeded.Id, ApplicationStatus.Interview);
         }
 
         await vm.ActivateAsync();
@@ -135,21 +136,100 @@ public class DashboardViewModelTests : ViewModelTestBase
         Assert.Equal(new[] { "Applied" }, Assert.Single(vm.StageDurationYAxes).Labels);
     }
 
-    [Theory]
-    [InlineData(6, "Good morning")]
-    [InlineData(11, "Good morning")]
-    [InlineData(12, "Good afternoon")]
-    [InlineData(17, "Good afternoon")]
-    [InlineData(18, "Good evening")]
-    [InlineData(23, "Good evening")]
-    public void Greeting_FollowsTheInjectedClock(int hour, string expected)
+    // ---------------- Quick submit ----------------
+
+    [Fact]
+    public async Task QuickSubmit_CreatesAnAppliedApplicationDatedToday()
     {
-        Clock.Set(new DateTimeOffset(2026, 9, 15, hour, 0, 0, TimeSpan.Zero));
-
         var vm = NewDashboardViewModel();
+        await vm.ActivateAsync();
 
-        Assert.Equal(expected, vm.Greeting);
-        Assert.Equal(expected, vm.Title);
+        vm.QuickCompany = "  Quick Co  ";
+        vm.QuickJobTitle = "  Engineer  ";
+        vm.QuickLocation = "  Boston, MA  ";
+        vm.QuickInterest = InterestLevel.Green;
+
+        await vm.QuickSubmitCommand.ExecuteAsync(null);
+
+        var saved = Assert.Single(await AllAsync());
+        Assert.Equal("Quick Co", saved.CompanyName);
+        Assert.Equal("Engineer", saved.JobTitle);
+        Assert.Equal("Boston, MA", saved.Location);
+        Assert.Equal(InterestLevel.Green, saved.InterestLevel);
+        Assert.Equal(ApplicationStatus.Applied, saved.Status);
+        Assert.Equal(Clock.Today, saved.DateApplied);
+
+        // Seeded through AddAsync, so it opens its own history - without that entry the row
+        // would be invisible to every rate on this page.
+        var reloaded = (await LoadAsync(saved.Id))!;
+        var entry = Assert.Single(reloaded.StatusHistory);
+        Assert.Equal(ApplicationStatus.Applied, entry.Status);
+
+        // Nothing navigates: the point of the box is that you stay on the dashboard.
+        Assert.Equal(0, Navigation.NewApplicationCount);
+        Assert.Equal(0, Navigation.ApplicationsCount);
+    }
+
+    [Fact]
+    public async Task QuickSubmit_IsDisabledUntilCompanyAndTitleAreFilled()
+    {
+        var vm = NewDashboardViewModel();
+        await vm.ActivateAsync();
+
+        Assert.False(vm.CanQuickSubmit);
+        Assert.False(vm.QuickSubmitCommand.CanExecute(null));
+
+        vm.QuickCompany = "Quick Co";
+        Assert.False(vm.QuickSubmitCommand.CanExecute(null));
+
+        vm.QuickJobTitle = "Engineer";
+        Assert.True(vm.QuickSubmitCommand.CanExecute(null));
+
+        // Whitespace is not a company name; the entity requires a real one.
+        vm.QuickCompany = "   ";
+        Assert.False(vm.QuickSubmitCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task QuickSubmit_ClearsTheFormAndRefreshesTheAnalytics()
+    {
+        var vm = NewDashboardViewModel();
+        await vm.ActivateAsync();
+
+        Assert.True(vm.IsEmpty);
+        Assert.Equal(0, vm.TotalApplications);
+
+        vm.QuickCompany = "Quick Co";
+        vm.QuickJobTitle = "Engineer";
+        vm.QuickLocation = "Remote";
+        vm.QuickInterest = InterestLevel.Red;
+
+        await vm.QuickSubmitCommand.ExecuteAsync(null);
+
+        // The form empties so the next one can be typed straight in.
+        Assert.Equal(string.Empty, vm.QuickCompany);
+        Assert.Equal(string.Empty, vm.QuickJobTitle);
+        Assert.Equal(string.Empty, vm.QuickLocation);
+        Assert.Equal(InterestLevel.Yellow, vm.QuickInterest);
+
+        // And the page recomputes in place rather than waiting for a navigation.
+        Assert.Equal(1, vm.TotalApplications);
+        Assert.Equal(1, vm.ActiveApplications);
+        Assert.Equal(1, vm.AppliedLast7Days);
+        Assert.True(vm.HasData);
+        Assert.False(vm.IsEmpty);
+        Assert.Equal(new[] { "Applied" }, vm.StatusSeries.Select(x => x.Name));
+    }
+
+    [Fact]
+    public void Title_IsTheStaticPageName()
+    {
+        Clock.Set(new DateTimeOffset(2026, 9, 15, 6, 0, 0, TimeSpan.Zero));
+        Assert.Equal("Dashboard", NewDashboardViewModel().Title);
+
+        // No greeting any more, so the header must not move with the clock.
+        Clock.Set(new DateTimeOffset(2026, 9, 15, 22, 0, 0, TimeSpan.Zero));
+        Assert.Equal("Dashboard", NewDashboardViewModel().Title);
     }
 
     [Fact]

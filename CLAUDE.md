@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project
 
 A local Windows 11 job-application tracker with persistent SQLite storage, built to the SRS
-(rev 1.0). Three screens: a dashboard (greeting + hunt statistics and graphs), an add/edit
+(rev 1.0). Three screens: a dashboard (quick-submit box + hunt statistics and graphs), an add/edit
 application page, and a sortable/filterable applications list.
 
 **Current state: complete.** WPF on .NET 8, MVVM via CommunityToolkit.Mvvm, charts via
@@ -61,17 +61,22 @@ concerns belong in `Data/Configurations/`, one `IEntityTypeConfiguration<T>` per
 automatically by `ApplyConfigurationsFromAssembly`. `App` references `Data` only in
 `App.xaml.cs`, to wire the container.
 
-**Data model.** `Application` is the root; `SubmittedItem` (what was sent to the recruiter, by
-name), `Contact` (people messaged), and `StatusChange` (the stage history) are child tables with
-cascade delete, not columns. Interview rounds are `Status = Interview` plus an `InterviewRound`
-int, not one status per round.
+**Data model.** `Application` is the root; `Contact` (people messaged) and `StatusChange` (the
+stage history) are child tables with cascade delete, not columns. What was sent to the recruiter is
+two booleans on the root — `ResumeSubmitted` and `CoverLetterSubmitted` — not a child table.
+Interview rounds are `Status = Interview` plus an `InterviewRound` int, not one status per round,
+and `InterviewDate` sits beside it under the same rule.
 
-**The pipeline is a history, not a column.** `ApplicationStatus` runs
-Wishlist → Applied → PhoneScreen → Interview → Offer, plus Rejected and Withdrawn, which anything
-can reach at any point. `Application.Status` is only the latest entry — **always move an
-application with `IApplicationRepository.ChangeStatusAsync`**, never by assigning `Status`.
-Assigning it directly leaves no `StatusChange` behind, and the interview/offer rates and the
-stage-duration chart are computed entirely from that history.
+**The pipeline is a history, not a column.** `ApplicationStatus` is exactly three stages —
+Applied → Interview → Rejected — where Rejected is reachable from either of the others.
+`Application.Status` is only the latest entry — **always move an application with
+`IApplicationRepository.ChangeStatusAsync`**, never by assigning `Status`. Assigning it directly
+leaves no `StatusChange` behind, and the interview/rejection rates and the stage-duration chart are
+computed entirely from that history.
+
+**`InterviewRound` and `InterviewDate` only exist inside Interview.** `ChangeStatusAsync` nulls
+both when moving to any other stage, so a move *into* Interview that also sets them has to re-apply
+them after the transition — `ApplicationEditorViewModel.SaveAsync` does exactly that.
 
 **Timestamps are automatic.** `JobAppContext.StampTimestamps` sets `CreatedUtc`/`UpdatedUtc` on
 save, explicitly un-modifies `CreatedUtc` on updates, and stamps `StatusChange.ChangedUtc` on
@@ -81,7 +86,7 @@ insert. Never assign any of them by hand.
 `RepositoryFactory`, `DashboardViewModel`, and `ApplicationEditorViewModel` all take one, defaulting
 to `TimeProvider.System`; the container registers a single instance. Do not reintroduce a direct
 `DateTime.Now`/`UtcNow` read — it is the seam that makes the statistics windows, the timestamps, and
-the greeting testable.
+the quick-submit date testable.
 
 **Database location:** `%LOCALAPPDATA%\JobApplicationManager\jobapps.db`, resolved by
 `DbPathProvider`. Startup path is `DatabaseInitializer.CreateAndMigrate()`, which applies
@@ -101,7 +106,7 @@ because a fabricated zero and "no data yet" are different statements.
 
 ```
 tests/JobAppManager.TestSupport/   SqliteTestFixture, FixedClock, ApplicationBuilder, TestData
-tests/JobAppManager.Data.Tests/    repository, persistence, statistics, status history
+tests/JobAppManager.Data.Tests/    repository, persistence, statistics, status history, migrations
 tests/JobAppManager.App.Tests/     ViewModels, converters, navigation  (net8.0-windows, UseWPF)
 ```
 
@@ -114,11 +119,18 @@ refuses a class fixture with more than one, or with optional parameters - so the
 the static `SqliteTestFixture.WithClock(...)`.
 
 **Use `FixedClock` for anything time-dependent.** Pass it to the fixture and to the repository, and
-the "last N days" windows, the stamped timestamps, and the dashboard greeting all become exact
-instead of tolerance-banded. It also pins the local timezone to UTC so results do not move with the
+the "last N days" windows, the stamped timestamps, and the date a quick-submitted application
+gets all become exact instead of tolerance-banded. It also pins the local timezone to UTC so results do not move with the
 machine. To build an application that sat in a stage for eleven days, advance the clock between
 real `ChangeStatusAsync` calls - never insert history rows with raw SQL, which skips the code path
 the app actually uses.
+
+**Data-carrying migrations get their own tests.** Every other test starts from an empty database,
+which exercises a migration's DDL but never its `Sql()` statements. `MigrationTests` migrates to a
+named earlier migration with `IMigrator.MigrateAsync("<id>")`, writes rows in the *old* shape with
+raw SQL, then migrates the rest of the way and asserts on what survived. Any future migration that
+remaps or backfills belongs there — writing one without a test means the remap is first run on a
+user's real data.
 
 **ViewModel tests are integration tests by design.** They run against a real `RepositoryFactory`
 over a real SQLite file (`ViewModelTestBase`), because a fake `IApplicationRepository` would have to

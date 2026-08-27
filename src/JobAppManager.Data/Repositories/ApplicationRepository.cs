@@ -86,10 +86,11 @@ public class ApplicationRepository : IApplicationRepository
 
         application.Status = newStatus;
 
-        // Round numbering only means anything inside Interview.
+        // The round number and the interview date only mean anything inside Interview.
         if (newStatus != ApplicationStatus.Interview)
         {
             application.InterviewRound = null;
+            application.InterviewDate = null;
         }
 
         _context.StatusChanges.Add(new StatusChange
@@ -105,7 +106,6 @@ public class ApplicationRepository : IApplicationRepository
 
     public Task<Application?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
         _context.Applications
-            .Include(a => a.SubmittedItems)
             .Include(a => a.Contacts)
             .Include(a => a.StatusHistory.OrderBy(s => s.ChangedUtc))
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
@@ -214,33 +214,26 @@ public class ApplicationRepository : IApplicationRepository
         var byStatus = ZeroFill<ApplicationStatus>(
             statusCounts.ToDictionary(x => x.Key, x => x.Count));
 
-        var active = total
-            - byStatus[ApplicationStatus.Rejected]
-            - byStatus[ApplicationStatus.Withdrawn];
+        var active = total - byStatus[ApplicationStatus.Rejected];
 
         // Rates are answered from history, not the current status: an application that was
-        // interviewed and then rejected still counts as an interview reached.
+        // interviewed and then rejected still counts as an interview reached. Every application
+        // was sent somewhere, so all of them are in the denominator.
         var reached = await _context.StatusChanges
             .GroupBy(s => s.ApplicationId)
             .Select(g => new
             {
-                Submitted = g.Any(s => s.Status != ApplicationStatus.Wishlist),
-                Interviewed = g.Any(s =>
-                    s.Status == ApplicationStatus.PhoneScreen ||
-                    s.Status == ApplicationStatus.Interview ||
-                    s.Status == ApplicationStatus.Offer),
-                Offered = g.Any(s => s.Status == ApplicationStatus.Offer)
+                Interviewed = g.Any(s => s.Status == ApplicationStatus.Interview),
+                RejectedEver = g.Any(s => s.Status == ApplicationStatus.Rejected)
             })
             .ToListAsync(cancellationToken);
-
-        var submitted = reached.Count(x => x.Submitted);
 
         return new JobHuntStatistics
         {
             TotalApplications = total,
             ActiveApplications = active,
-            InterviewRate = Rate(reached.Count(x => x.Submitted && x.Interviewed), submitted),
-            OfferRate = Rate(reached.Count(x => x.Submitted && x.Offered), submitted),
+            InterviewRate = Rate(reached.Count(x => x.Interviewed), reached.Count),
+            RejectionRate = Rate(reached.Count(x => x.RejectedEver), reached.Count),
             CountByStatus = byStatus,
             CountByInterest = ZeroFill<InterestLevel>(
                 interestCounts.ToDictionary(x => x.Key, x => x.Count)),

@@ -9,21 +9,6 @@ using JobAppManager.Core.Enums;
 
 namespace JobAppManager.App.ViewModels;
 
-/// <summary>One editable "what I sent them" row.</summary>
-public partial class SubmittedItemRow : ObservableObject
-{
-    public int Id { get; init; }
-
-    [ObservableProperty]
-    private SubmissionKind _kind = SubmissionKind.Resume;
-
-    [ObservableProperty]
-    private string _name = string.Empty;
-
-    [ObservableProperty]
-    private DateOnly? _submittedOn;
-}
-
 /// <summary>One editable "who I talked to" row.</summary>
 public partial class ContactRow : ObservableObject
 {
@@ -79,16 +64,11 @@ public partial class ApplicationEditorViewModel : ObservableValidator
 
         Statuses = Enum.GetValues<ApplicationStatus>();
         InterestLevels = Enum.GetValues<InterestLevel>();
-        SubmissionKinds = Enum.GetValues<SubmissionKind>();
     }
 
     public IReadOnlyList<ApplicationStatus> Statuses { get; }
 
     public IReadOnlyList<InterestLevel> InterestLevels { get; }
-
-    public IReadOnlyList<SubmissionKind> SubmissionKinds { get; }
-
-    public ObservableCollection<SubmittedItemRow> SubmittedItems { get; } = new();
 
     public ObservableCollection<ContactRow> Contacts { get; } = new();
 
@@ -130,11 +110,6 @@ public partial class ApplicationEditorViewModel : ObservableValidator
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [MaxLength(100, ErrorMessage = "Salary range must be 100 characters or fewer.")]
-    private string? _salaryRange;
-
-    [ObservableProperty]
-    [NotifyDataErrorInfo]
     [CustomValidation(typeof(ApplicationEditorViewModel), nameof(ValidateDateApplied))]
     private DateOnly _dateApplied;
 
@@ -150,7 +125,16 @@ public partial class ApplicationEditorViewModel : ObservableValidator
     private int? _interviewRound;
 
     [ObservableProperty]
+    private DateOnly? _interviewDate;
+
+    [ObservableProperty]
     private bool _fromJobFair;
+
+    [ObservableProperty]
+    private bool _resumeSubmitted;
+
+    [ObservableProperty]
+    private bool _coverLetterSubmitted;
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
@@ -164,9 +148,9 @@ public partial class ApplicationEditorViewModel : ObservableValidator
     [ObservableProperty]
     private bool _isBusy;
 
-    /// <summary>Round numbering is only meaningful inside Interview, matching the rule the
-    /// repository enforces on every transition.</summary>
-    public bool ShowsInterviewRound => Status == ApplicationStatus.Interview;
+    /// <summary>The round number and the interview date are only meaningful inside Interview,
+    /// matching the rule the repository enforces on every transition.</summary>
+    public bool ShowsInterviewFields => Status == ApplicationStatus.Interview;
 
     /// <summary>The status-change note only earns its space when the status is actually moving.</summary>
     public bool IsStatusChanging => !IsNew && Status != _statusOnLoad;
@@ -178,9 +162,10 @@ public partial class ApplicationEditorViewModel : ObservableValidator
         if (value != ApplicationStatus.Interview)
         {
             InterviewRound = null;
+            InterviewDate = null;
         }
 
-        OnPropertyChanged(nameof(ShowsInterviewRound));
+        OnPropertyChanged(nameof(ShowsInterviewFields));
         OnPropertyChanged(nameof(IsStatusChanging));
     }
 
@@ -234,16 +219,16 @@ public partial class ApplicationEditorViewModel : ObservableValidator
         JobTitle = string.Empty;
         Location = string.Empty;
         JobUrl = null;
-        SalaryRange = null;
         DateApplied = Today;
         Status = ApplicationStatus.Applied;
         InterestLevel = InterestLevel.Yellow;
         InterviewRound = null;
+        InterviewDate = null;
         FromJobFair = false;
+        ResumeSubmitted = false;
+        CoverLetterSubmitted = false;
         Notes = null;
         StatusChangeNote = null;
-
-        SubmittedItems.Clear();
         Contacts.Clear();
         StatusHistory.Clear();
 
@@ -273,27 +258,16 @@ public partial class ApplicationEditorViewModel : ObservableValidator
         JobTitle = application.JobTitle;
         Location = application.Location;
         JobUrl = application.JobUrl;
-        SalaryRange = application.SalaryRange;
         DateApplied = application.DateApplied;
         Status = application.Status;
         InterestLevel = application.InterestLevel;
         InterviewRound = application.InterviewRound;
+        InterviewDate = application.InterviewDate;
         FromJobFair = application.FromJobFair;
+        ResumeSubmitted = application.ResumeSubmitted;
+        CoverLetterSubmitted = application.CoverLetterSubmitted;
         Notes = application.Notes;
         StatusChangeNote = null;
-
-        SubmittedItems.Clear();
-
-        foreach (var item in application.SubmittedItems)
-        {
-            SubmittedItems.Add(new SubmittedItemRow
-            {
-                Id = item.Id,
-                Kind = item.Kind,
-                Name = item.Name,
-                SubmittedOn = item.SubmittedOn
-            });
-        }
 
         Contacts.Clear();
 
@@ -329,27 +303,12 @@ public partial class ApplicationEditorViewModel : ObservableValidator
         OnPropertyChanged(nameof(Title));
         OnPropertyChanged(nameof(Subtitle));
         OnPropertyChanged(nameof(SaveLabel));
-        OnPropertyChanged(nameof(ShowsInterviewRound));
+        OnPropertyChanged(nameof(ShowsInterviewFields));
         OnPropertyChanged(nameof(IsStatusChanging));
         OnPropertyChanged(nameof(HasStatusHistory));
     }
 
     // ---------------- Child rows ----------------
-
-    [RelayCommand]
-    private void AddSubmittedItem() => SubmittedItems.Add(new SubmittedItemRow
-    {
-        SubmittedOn = DateApplied
-    });
-
-    [RelayCommand]
-    private void RemoveSubmittedItem(SubmittedItemRow? row)
-    {
-        if (row is not null)
-        {
-            SubmittedItems.Remove(row);
-        }
-    }
 
     [RelayCommand]
     private void AddContact() => Contacts.Add(new ContactRow());
@@ -377,10 +336,6 @@ public partial class ApplicationEditorViewModel : ObservableValidator
 
         // Blank rows are what a user leaves behind after clicking Add and changing their mind;
         // silently dropping them beats rejecting the whole save over one empty line.
-        var submittedItems = SubmittedItems
-            .Where(i => !string.IsNullOrWhiteSpace(i.Name))
-            .ToList();
-
         var contacts = Contacts
             .Where(c => !string.IsNullOrWhiteSpace(c.Name) || !string.IsNullOrWhiteSpace(c.Email))
             .ToList();
@@ -412,7 +367,7 @@ public partial class ApplicationEditorViewModel : ObservableValidator
                     return;
                 }
 
-                ApplyTo(existing, submittedItems, contacts);
+                ApplyTo(existing, contacts);
 
                 // Status deliberately excluded from ApplyTo: moving through the pipeline has to
                 // go through the repository so the change lands in the history too.
@@ -425,15 +380,18 @@ public partial class ApplicationEditorViewModel : ObservableValidator
                         Status,
                         string.IsNullOrWhiteSpace(StatusChangeNote) ? null : StatusChangeNote.Trim());
 
-                    // Round number is set on the entity, but ChangeStatusAsync clears it when
-                    // moving away from Interview - so re-apply it for a move *into* Interview.
-                    if (Status == ApplicationStatus.Interview && InterviewRound is not null)
+                    // The round number and interview date are set on the entity, but
+                    // ChangeStatusAsync clears both when moving away from Interview - so
+                    // re-apply them for a move *into* Interview.
+                    if (Status == ApplicationStatus.Interview
+                        && (InterviewRound is not null || InterviewDate is not null))
                     {
                         var refreshed = await scope.Repository.GetByIdAsync(id);
 
                         if (refreshed is not null)
                         {
                             refreshed.InterviewRound = InterviewRound;
+                            refreshed.InterviewDate = InterviewDate;
                             await scope.Repository.UpdateAsync(refreshed);
                         }
                     }
@@ -442,7 +400,7 @@ public partial class ApplicationEditorViewModel : ObservableValidator
             else
             {
                 var application = new Application { Status = Status };
-                ApplyTo(application, submittedItems, contacts);
+                ApplyTo(application, contacts);
                 await scope.Repository.AddAsync(application);
             }
         }
@@ -454,36 +412,23 @@ public partial class ApplicationEditorViewModel : ObservableValidator
         _navigation.GoToApplications();
     }
 
-    private void ApplyTo(
-        Application application,
-        IReadOnlyList<SubmittedItemRow> submittedItems,
-        IReadOnlyList<ContactRow> contacts)
+    private void ApplyTo(Application application, IReadOnlyList<ContactRow> contacts)
     {
         application.CompanyName = CompanyName.Trim();
         application.JobTitle = JobTitle.Trim();
         application.Location = Location?.Trim() ?? string.Empty;
         application.JobUrl = string.IsNullOrWhiteSpace(JobUrl) ? null : JobUrl.Trim();
-        application.SalaryRange = string.IsNullOrWhiteSpace(SalaryRange) ? null : SalaryRange.Trim();
         application.DateApplied = DateApplied;
         application.InterestLevel = InterestLevel;
         application.InterviewRound = Status == ApplicationStatus.Interview ? InterviewRound : null;
+        application.InterviewDate = Status == ApplicationStatus.Interview ? InterviewDate : null;
         application.FromJobFair = FromJobFair;
+        application.ResumeSubmitted = ResumeSubmitted;
+        application.CoverLetterSubmitted = CoverLetterSubmitted;
         application.Notes = string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim();
 
-        // Replacing the collections wholesale lets EF work out the inserts, updates, and cascade
+        // Replacing the collection wholesale lets EF work out the inserts, updates, and cascade
         // deletes; matching by Id keeps rows the user only edited from being deleted and re-added.
-        SyncChildren(
-            application.SubmittedItems,
-            submittedItems,
-            row => row.Id,
-            entity => entity.Id,
-            (entity, row) =>
-            {
-                entity.Kind = row.Kind;
-                entity.Name = row.Name.Trim();
-                entity.SubmittedOn = row.SubmittedOn;
-            });
-
         SyncChildren(
             application.Contacts,
             contacts,

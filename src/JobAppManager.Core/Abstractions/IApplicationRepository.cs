@@ -7,14 +7,13 @@ namespace JobAppManager.Core.Abstractions;
 /// on it without referencing EF Core.</summary>
 public interface IApplicationRepository
 {
-    /// <summary>Inserts a new application together with any submitted items and contacts
-    /// attached to it. Returns the saved entity with its assigned <see cref="Application.Id"/>.</summary>
+    /// <summary>Inserts a new application together with any contacts attached to it. Returns the saved entity with its assigned <see cref="Application.Id"/>.</summary>
     Task<Application> AddAsync(Application application, CancellationToken cancellationToken = default);
 
     /// <summary>Persists changes to an existing application and its children.</summary>
     Task UpdateAsync(Application application, CancellationToken cancellationToken = default);
 
-    /// <summary>Deletes an application and, by cascade, its submitted items and contacts.
+    /// <summary>Deletes an application and, by cascade, its contacts and status history.
     /// Returns false if no application with that id exists.</summary>
     Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default);
 
@@ -28,7 +27,7 @@ public interface IApplicationRepository
         string? note = null,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Loads one application with its submitted items, contacts, and status history, or null.</summary>
+    /// <summary>Loads one application with its contacts and status history, or null.</summary>
     Task<Application?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 
     /// <summary>Filtered, sorted list for the spreadsheet page. Children are not loaded.</summary>

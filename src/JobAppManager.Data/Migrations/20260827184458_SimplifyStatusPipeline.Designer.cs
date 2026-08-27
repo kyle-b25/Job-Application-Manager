@@ -3,6 +3,7 @@ using System;
 using JobAppManager.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace JobAppManager.Data.Migrations
 {
     [DbContext(typeof(JobAppContext))]
-    partial class JobAppContextModelSnapshot : ModelSnapshot
+    [Migration("20260827184458_SimplifyStatusPipeline")]
+    partial class SimplifyStatusPipeline
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.8");
@@ -27,9 +30,6 @@ namespace JobAppManager.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
-
-                    b.Property<bool>("CoverLetterSubmitted")
-                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedUtc")
                         .HasColumnType("TEXT");
@@ -67,8 +67,9 @@ namespace JobAppManager.Data.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("ResumeSubmitted")
-                        .HasColumnType("INTEGER");
+                    b.Property<string>("SalaryRange")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");
@@ -146,6 +147,33 @@ namespace JobAppManager.Data.Migrations
                     b.ToTable("StatusChanges", (string)null);
                 });
 
+            modelBuilder.Entity("JobAppManager.Core.Entities.SubmittedItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ApplicationId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly?>("SubmittedOn")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationId");
+
+                    b.ToTable("SubmittedItems", (string)null);
+                });
+
             modelBuilder.Entity("JobAppManager.Core.Entities.Contact", b =>
                 {
                     b.HasOne("JobAppManager.Core.Entities.Application", "Application")
@@ -168,11 +196,24 @@ namespace JobAppManager.Data.Migrations
                     b.Navigation("Application");
                 });
 
+            modelBuilder.Entity("JobAppManager.Core.Entities.SubmittedItem", b =>
+                {
+                    b.HasOne("JobAppManager.Core.Entities.Application", "Application")
+                        .WithMany("SubmittedItems")
+                        .HasForeignKey("ApplicationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Application");
+                });
+
             modelBuilder.Entity("JobAppManager.Core.Entities.Application", b =>
                 {
                     b.Navigation("Contacts");
 
                     b.Navigation("StatusHistory");
+
+                    b.Navigation("SubmittedItems");
                 });
 #pragma warning restore 612, 618
         }

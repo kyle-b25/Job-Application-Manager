@@ -20,13 +20,12 @@ public static class TestData
             .In("Remote - US")
             .AppliedOn(dateApplied ?? new DateOnly(2026, 8, 20))
             .WithUrl("https://acme.example/careers/12345")
-            .WithSalary("$140k - $170k")
             .WithInterest(InterestLevel.Green)
-            .WithStatus(ApplicationStatus.Interview, interviewRound: 2)
+            .WithStatus(ApplicationStatus.Interview, interviewRound: 2, interviewDate: new DateOnly(2026, 8, 28))
             .FromJobFair()
             .WithNotes("Met the hiring manager at the fall career fair.")
-            .WithSubmittedItem("Resume - Backend v3", SubmissionKind.Resume, new DateOnly(2026, 8, 20))
-            .WithSubmittedItem("HackerRank screen", SubmissionKind.Assessment, new DateOnly(2026, 8, 22))
+            .WithResume()
+            .WithCoverLetter()
             .WithContact("Dana Reed", "dana.reed@acme.example", "Recruiter", new DateOnly(2026, 8, 21))
             .Build();
 

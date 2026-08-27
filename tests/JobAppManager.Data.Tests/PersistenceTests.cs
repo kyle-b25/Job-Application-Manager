@@ -45,12 +45,8 @@ public class PersistenceTests : IClassFixture<SqliteTestFixture>
             Assert.True(loaded.FromJobFair);
             Assert.Equal("Met the hiring manager at the fall career fair.", loaded.Notes);
 
-            Assert.Equal(2, loaded.SubmittedItems.Count);
-            Assert.Contains(loaded.SubmittedItems,
-                s => s.Kind == SubmissionKind.Resume && s.Name == "Resume - Backend v3");
-            Assert.Contains(loaded.SubmittedItems,
-                s => s.Kind == SubmissionKind.Assessment
-                     && s.SubmittedOn == new DateOnly(2026, 8, 22));
+            Assert.True(loaded.ResumeSubmitted);
+            Assert.True(loaded.CoverLetterSubmitted);
 
             var contact = Assert.Single(loaded.Contacts);
             Assert.Equal("dana.reed@acme.example", contact.Email);
@@ -79,7 +75,6 @@ public class PersistenceTests : IClassFixture<SqliteTestFixture>
         await using (var context = _fixture.CreateContext())
         {
             Assert.Null(await context.Applications.FindAsync(id));
-            Assert.Empty(await context.SubmittedItems.Where(s => s.ApplicationId == id).ToListAsync());
             Assert.Empty(await context.Contacts.Where(c => c.ApplicationId == id).ToListAsync());
         }
     }

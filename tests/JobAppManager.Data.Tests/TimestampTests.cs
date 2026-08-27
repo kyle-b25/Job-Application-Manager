@@ -87,7 +87,7 @@ public class TimestampTests : IDisposable
         await using (var context = _fixture.CreateContext())
         {
             await new ApplicationRepository(context)
-                .ChangeStatusAsync(id, ApplicationStatus.PhoneScreen);
+                .ChangeStatusAsync(id, ApplicationStatus.Interview);
         }
 
         await using (var context = _fixture.CreateContext())
@@ -138,16 +138,14 @@ public class TimestampTests : IDisposable
         await using (var context = _fixture.CreateContext())
         {
             var saved = await new ApplicationRepository(context).AddAsync(
-                TestData.Minimal("Ordered Co", new DateOnly(2026, 5, 1), ApplicationStatus.Wishlist));
+                TestData.Minimal("Ordered Co", new DateOnly(2026, 5, 1), ApplicationStatus.Applied));
             id = saved.Id;
         }
 
         foreach (var status in new[]
                  {
-                     ApplicationStatus.Applied,
-                     ApplicationStatus.PhoneScreen,
                      ApplicationStatus.Interview,
-                     ApplicationStatus.Offer
+                     ApplicationStatus.Rejected
                  })
         {
             _clock.AdvanceDays(3);
@@ -165,11 +163,9 @@ public class TimestampTests : IDisposable
             Assert.Equal(
                 new[]
                 {
-                    ApplicationStatus.Wishlist,
                     ApplicationStatus.Applied,
-                    ApplicationStatus.PhoneScreen,
                     ApplicationStatus.Interview,
-                    ApplicationStatus.Offer
+                    ApplicationStatus.Rejected
                 },
                 loaded.StatusHistory.Select(h => h.Status));
         }

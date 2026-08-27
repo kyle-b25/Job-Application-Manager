@@ -17,9 +17,6 @@ public class Application
 
     public string? JobUrl { get; set; }
 
-    /// <summary>Free text, not a number: postings quote ranges, hourly rates, and "competitive".</summary>
-    public string? SalaryRange { get; set; }
-
     public InterestLevel InterestLevel { get; set; } = InterestLevel.Yellow;
 
     /// <summary>The latest status. Move it with <c>IApplicationRepository.ChangeStatusAsync</c>
@@ -30,7 +27,19 @@ public class Application
     /// <see cref="ApplicationStatus.Interview"/>. Null otherwise.</summary>
     public int? InterviewRound { get; set; }
 
+    /// <summary>When the interview is, or was. Only meaningful while <see cref="Status"/> is
+    /// <see cref="ApplicationStatus.Interview"/>; cleared on the way out, like
+    /// <see cref="InterviewRound"/>.</summary>
+    public DateOnly? InterviewDate { get; set; }
+
     public bool FromJobFair { get; set; }
+
+    /// <summary>Whether a resume went with this application. A flag rather than a named row:
+    /// the useful question is "did I send one", not "which version".</summary>
+    public bool ResumeSubmitted { get; set; }
+
+    /// <summary>Whether a cover letter went with this application.</summary>
+    public bool CoverLetterSubmitted { get; set; }
 
     public string? Notes { get; set; }
 
@@ -39,8 +48,6 @@ public class Application
 
     /// <summary>Stamped by <c>JobAppContext.SaveChanges</c>; never set this by hand.</summary>
     public DateTime UpdatedUtc { get; set; }
-
-    public ICollection<SubmittedItem> SubmittedItems { get; set; } = new List<SubmittedItem>();
 
     public ICollection<Contact> Contacts { get; set; } = new List<Contact>();
 

@@ -13,6 +13,10 @@
          net8.0-windows one. It loads and runs fine on .NET 8; NU1701 is just NuGet noting the
          mismatch, and left on it buries real warnings. -->
     <NoWarn>$(NoWarn);NU1701</NoWarn>
+    <!-- Declared so `dotnet publish -r win-x64` restores the right native assets. Self-contained
+         and single-file stay on the publish command line rather than here, so a plain build and
+         `dotnet run` are unaffected. -->
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
   </PropertyGroup>
 
   <ItemGroup>

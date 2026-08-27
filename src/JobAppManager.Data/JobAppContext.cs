@@ -20,8 +20,6 @@ public class JobAppContext : DbContext
 
     public DbSet<Application> Applications => Set<Application>();
 
-    public DbSet<SubmittedItem> SubmittedItems => Set<SubmittedItem>();
-
     public DbSet<Contact> Contacts => Set<Contact>();
 
     public DbSet<StatusChange> StatusChanges => Set<StatusChange>();

@@ -42,6 +42,9 @@ public class StatisticsTests : IDisposable
         Assert.Empty(stats.DailyCounts);
 
         // Every enum member must still be present, so the UI never checks for a missing key.
+        // The literal 3 is deliberate: the self-adjusting Length check alone would keep passing
+        // if the pipeline were quietly narrowed again.
+        Assert.Equal(3, Enum.GetValues<ApplicationStatus>().Length);
         Assert.Equal(Enum.GetValues<ApplicationStatus>().Length, stats.CountByStatus.Count);
         Assert.All(stats.CountByStatus.Values, count => Assert.Equal(0, count));
         Assert.Equal(Enum.GetValues<InterestLevel>().Length, stats.CountByInterest.Count);
@@ -65,7 +68,6 @@ public class StatisticsTests : IDisposable
         Assert.Equal(2, stats.CountByStatus[ApplicationStatus.Applied]);
         Assert.Equal(1, stats.CountByStatus[ApplicationStatus.Interview]);
         Assert.Equal(1, stats.CountByStatus[ApplicationStatus.Rejected]);
-        Assert.Equal(0, stats.CountByStatus[ApplicationStatus.Offer]);
 
         Assert.Equal(2, stats.CountByInterest[InterestLevel.Green]);
         Assert.Equal(1, stats.CountByInterest[InterestLevel.Yellow]);

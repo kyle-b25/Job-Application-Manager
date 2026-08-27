@@ -16,25 +16,95 @@
         </Style>
     </UserControl.Resources>
 
+    <!-- The dashboard is two things and nothing else: a way to log an application in one line,
+         and the analytics. The quick-submit box sits outside the has-data/empty switch below it,
+         because an empty database is exactly when you most need somewhere to type. -->
     <Grid>
-        <!-- ==================== Populated dashboard ==================== -->
-        <ScrollViewer VerticalScrollBarVisibility="Auto"
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- ==================== Header + quick submit ==================== -->
+        <StackPanel Grid.Row="0" Margin="32,28,32,0">
+            <TextBlock Text="{Binding Title}" Style="{StaticResource PageTitleText}" />
+            <TextBlock Text="{Binding Subtitle}" Style="{StaticResource PageSubtitleText}" />
+
+            <Border Style="{StaticResource Card}" Margin="0,20,0,0">
+                <StackPanel>
+                    <TextBlock Text="Submit an application" Style="{StaticResource SectionTitleText}" />
+                    <TextBlock Style="{StaticResource MutedText}" FontSize="12" Margin="0,3,0,14"
+                               Text="Logged as Applied, dated today. Fill in the rest whenever you like." />
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                            <TextBlock Text="COMPANY" Style="{StaticResource FieldLabelText}" />
+                            <TextBox Style="{StaticResource FieldTextBox}"
+                                     Text="{Binding QuickCompany, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Margin="8,0">
+                            <TextBlock Text="JOB TITLE" Style="{StaticResource FieldLabelText}" />
+                            <TextBox Style="{StaticResource FieldTextBox}"
+                                     Text="{Binding QuickJobTitle, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" Margin="8,0">
+                            <TextBlock Text="LOCATION" Style="{StaticResource FieldLabelText}" />
+                            <TextBox Style="{StaticResource FieldTextBox}"
+                                     Text="{Binding QuickLocation, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="3" Margin="8,0">
+                            <TextBlock Text="INTEREST" Style="{StaticResource FieldLabelText}" />
+                            <!-- Explicit ItemTemplate, not DisplayMemberPath: the custom ComboBox
+                                 template binds the selection box to ItemTemplate. -->
+                            <ComboBox Style="{StaticResource FieldComboBox}"
+                                      ItemsSource="{Binding InterestLevels}"
+                                      SelectedItem="{Binding QuickInterest}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <ContentControl Content="{Binding}"
+                                                            ContentTemplate="{StaticResource InterestDotTemplate}" />
+                                            <TextBlock Margin="9,0,0,0"
+                                                       Text="{Binding Converter={StaticResource EnumDisplayName}}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <Button Grid.Column="4" Margin="8,0,0,0"
+                                Content="Add application"
+                                Style="{StaticResource PrimaryButton}"
+                                VerticalAlignment="Bottom"
+                                Command="{Binding QuickSubmitCommand}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- ==================== Analytics ==================== -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
                       Visibility="{Binding HasData, Converter={StaticResource Truthy}}">
-            <Grid Margin="32,28,32,32">
+            <Grid Margin="32,16,32,32">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <StackPanel Grid.Row="0">
-                    <TextBlock Text="{Binding Greeting}" Style="{StaticResource PageTitleText}" />
-                    <TextBlock Text="{Binding Subtitle}" Style="{StaticResource PageSubtitleText}" />
-                </StackPanel>
-
                 <!-- ========== Summary cards ========== -->
-                <UniformGrid Grid.Row="1" Columns="4" Margin="0,24,0,0">
+                <UniformGrid Grid.Row="0" Columns="4">
                     <Border Style="{StaticResource StatCard}" Margin="0,0,8,0">
                         <StackPanel>
                             <TextBlock Text="{Binding TotalApplications}" Style="{StaticResource StatValueText}" />
@@ -62,14 +132,14 @@
                     <Border Style="{StaticResource StatCard}" Margin="8,0,0,0">
                         <StackPanel>
                             <TextBlock Style="{StaticResource StatValueText}"
-                                       Text="{Binding OfferRate, Converter={StaticResource RateToPercent}}" />
-                            <TextBlock Text="Offer rate" Style="{StaticResource StatCaption}" />
+                                       Text="{Binding RejectionRate, Converter={StaticResource RateToPercent}}" />
+                            <TextBlock Text="Rejection rate" Style="{StaticResource StatCaption}" />
                         </StackPanel>
                     </Border>
                 </UniformGrid>
 
                 <!-- ========== Over time + status split ========== -->
-                <Grid Grid.Row="2" Margin="0,16,0,0">
+                <Grid Grid.Row="1" Margin="0,16,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="360" />
@@ -109,7 +179,7 @@
                 </Grid>
 
                 <!-- ========== Stage durations ========== -->
-                <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,16,0,0">
+                <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,16,0,0">
                     <StackPanel>
                         <TextBlock Text="Average time in each stage" Style="{StaticResource SectionTitleText}" />
                         <TextBlock Style="{StaticResource MutedText}" FontSize="12" Margin="0,3,0,0"
@@ -138,7 +208,7 @@
         </ScrollViewer>
 
         <!-- ==================== Empty state ==================== -->
-        <Border Style="{StaticResource Card}"
+        <Border Grid.Row="1" Style="{StaticResource Card}"
                 MaxWidth="460" Padding="40,44"
                 VerticalAlignment="Center" HorizontalAlignment="Center"
                 Visibility="{Binding IsEmpty, Converter={StaticResource Truthy}}">
@@ -152,7 +222,7 @@
                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
 
-                <TextBlock Text="{Binding Greeting}"
+                <TextBlock Text="No numbers yet"
                            Style="{StaticResource SectionTitleText}"
                            FontSize="19"
                            Margin="0,20,0,0"
@@ -161,10 +231,10 @@
                 <TextBlock Style="{StaticResource MutedText}"
                            Margin="0,8,0,0"
                            TextAlignment="Center" TextWrapping="Wrap"
-                           Text="There is nothing to chart yet. Add your first application and this page fills in with your rates, your pipeline, and how long each stage is taking." />
+                           Text="Add an application in the box above and this page fills in with your rates, your pipeline, and how long each stage is taking." />
 
-                <Button Content="Add your first application"
-                        Style="{StaticResource PrimaryButton}"
+                <Button Content="Open the full form"
+                        Style="{StaticResource SecondaryButton}"
                         Margin="0,24,0,0"
                         HorizontalAlignment="Center"
                         Command="{Binding AddFirstCommand}" />

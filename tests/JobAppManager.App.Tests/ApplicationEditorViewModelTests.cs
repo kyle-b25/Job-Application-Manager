@@ -109,11 +109,10 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
         var seeded = await SeedAsync(b => b
             .At("Leftover Co").For("Engineer")
             .WithUrl("https://leftover.example/1")
-            .WithSalary("$1")
             .WithNotes("Some notes")
             .WithStatus(ApplicationStatus.Interview, interviewRound: 3)
             .WithContact("Someone", "someone@example.com")
-            .WithSubmittedItem("Resume v1"));
+            .WithResume().WithCoverLetter());
 
         var vm = NewEditorViewModel();
         await vm.LoadAsync(seeded.Id);
@@ -127,12 +126,12 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
         Assert.Equal(string.Empty, vm.CompanyName);
         Assert.Equal(string.Empty, vm.JobTitle);
         Assert.Null(vm.JobUrl);
-        Assert.Null(vm.SalaryRange);
         Assert.Null(vm.Notes);
         Assert.Null(vm.InterviewRound);
         Assert.Equal(ApplicationStatus.Applied, vm.Status);
+        Assert.False(vm.ResumeSubmitted);
+        Assert.False(vm.CoverLetterSubmitted);
         Assert.Empty(vm.Contacts);
-        Assert.Empty(vm.SubmittedItems);
         Assert.Empty(vm.StatusHistory);
     }
 
@@ -145,7 +144,7 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
         Clock.AdvanceDays(4);
         await using (var scope = Repositories.Create())
         {
-            await scope.Repository.ChangeStatusAsync(seeded.Id, ApplicationStatus.PhoneScreen, "Recruiter called");
+            await scope.Repository.ChangeStatusAsync(seeded.Id, ApplicationStatus.Interview, "Recruiter called");
         }
 
         var vm = NewEditorViewModel();
@@ -154,12 +153,12 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
         Assert.False(vm.IsNew);
         Assert.Equal("Edit application", vm.Title);
         Assert.Equal("Timeline Co", vm.CompanyName);
-        Assert.Equal(ApplicationStatus.PhoneScreen, vm.Status);
+        Assert.Equal(ApplicationStatus.Interview, vm.Status);
 
         // Newest first: the timeline reads top-down as "most recent thing that happened".
         Assert.True(vm.HasStatusHistory);
         Assert.Equal(
-            new[] { ApplicationStatus.PhoneScreen, ApplicationStatus.Applied },
+            new[] { ApplicationStatus.Interview, ApplicationStatus.Applied },
             vm.StatusHistory.Select(h => h.Status));
         Assert.Equal("Recruiter called", vm.StatusHistory[0].Note);
     }
@@ -202,7 +201,6 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
         vm.CompanyName = "  Spaced Co  ";
         vm.JobTitle = "  Engineer  ";
         vm.Location = "  Remote  ";
-        vm.SalaryRange = "   ";
         vm.Notes = "   ";
 
         await vm.SaveCommand.ExecuteAsync(null);
@@ -213,7 +211,6 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
         Assert.Equal("Remote", saved.Location);
 
         // Null rather than "   ", so the detail pane's "is there anything here?" checks work.
-        Assert.Null(saved.SalaryRange);
         Assert.Null(saved.Notes);
     }
 
@@ -221,7 +218,7 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
     public async Task Save_OnANewApplication_SeedsExactlyOneHistoryEntry()
     {
         var vm = NewFilledEditor();
-        vm.Status = ApplicationStatus.Wishlist;
+        vm.Status = ApplicationStatus.Interview;
 
         await vm.SaveCommand.ExecuteAsync(null);
 
@@ -229,7 +226,7 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
         var reloaded = (await LoadAsync(saved.Id))!;
 
         var entry = Assert.Single(reloaded.StatusHistory);
-        Assert.Equal(ApplicationStatus.Wishlist, entry.Status);
+        Assert.Equal(ApplicationStatus.Interview, entry.Status);
         Assert.Equal(1, Navigation.ApplicationsCount);
     }
 
@@ -281,26 +278,55 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
     }
 
     [Fact]
-    public async Task Save_MovingAwayFromInterview_ClearsTheRoundNumber()
+    public async Task Save_MovingAwayFromInterview_ClearsTheRoundNumberAndTheInterviewDate()
     {
         var seeded = await SeedAsync(b => b
-            .At("Round Co").WithStatus(ApplicationStatus.Interview, interviewRound: 2));
+            .At("Round Co")
+            .WithStatus(
+                ApplicationStatus.Interview,
+                interviewRound: 2,
+                interviewDate: new DateOnly(2026, 9, 20)));
 
         var vm = NewEditorViewModel();
         await vm.LoadAsync(seeded.Id);
-        Assert.True(vm.ShowsInterviewRound);
+        Assert.True(vm.ShowsInterviewFields);
         Assert.Equal(2, vm.InterviewRound);
+        Assert.Equal(new DateOnly(2026, 9, 20), vm.InterviewDate);
 
         vm.Status = ApplicationStatus.Rejected;
 
-        // The round field disappears from the form the moment the stage leaves Interview.
-        Assert.False(vm.ShowsInterviewRound);
+        // Both interview fields disappear from the form the moment the stage leaves Interview.
+        Assert.False(vm.ShowsInterviewFields);
         Assert.Null(vm.InterviewRound);
+        Assert.Null(vm.InterviewDate);
 
         await vm.SaveCommand.ExecuteAsync(null);
 
         var reloaded = (await LoadAsync(seeded.Id))!;
         Assert.Null(reloaded.InterviewRound);
+        Assert.Null(reloaded.InterviewDate);
+    }
+
+    [Fact]
+    public async Task Save_MovingIntoInterview_KeepsTheRoundNumberAndTheInterviewDate()
+    {
+        var seeded = await SeedAsync(b => b.At("Into Co").WithStatus(ApplicationStatus.Applied));
+
+        var vm = NewEditorViewModel();
+        await vm.LoadAsync(seeded.Id);
+
+        vm.Status = ApplicationStatus.Interview;
+        vm.InterviewRound = 1;
+        vm.InterviewDate = new DateOnly(2026, 9, 22);
+
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        // ChangeStatusAsync clears both on the way out of Interview, so a move *into* it has to
+        // put them back after the transition or the save silently loses what the user typed.
+        var reloaded = (await LoadAsync(seeded.Id))!;
+        Assert.Equal(ApplicationStatus.Interview, reloaded.Status);
+        Assert.Equal(1, reloaded.InterviewRound);
+        Assert.Equal(new DateOnly(2026, 9, 22), reloaded.InterviewDate);
     }
 
     // ---------------- Child rows ----------------
@@ -310,20 +336,20 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
     {
         var vm = NewFilledEditor();
 
-        vm.AddSubmittedItemCommand.Execute(null);   // left blank
-        vm.AddContactCommand.Execute(null);         // left blank
+        vm.AddContactCommand.Execute(null);   // left blank
 
-        vm.AddSubmittedItemCommand.Execute(null);
-        vm.SubmittedItems.Last().Name = "Resume - Backend v3";
+        vm.AddContactCommand.Execute(null);
+        vm.Contacts.Last().Name = "Dana Reed";
+        vm.Contacts.Last().Email = "dana.reed@acme.example";
 
         await vm.SaveCommand.ExecuteAsync(null);
 
         var saved = Assert.Single(await AllAsync());
         var reloaded = (await LoadAsync(saved.Id))!;
 
-        // Clicking "Add item" and changing your mind should not block the save.
-        Assert.Equal("Resume - Backend v3", Assert.Single(reloaded.SubmittedItems).Name);
-        Assert.Empty(reloaded.Contacts);
+        // Clicking "Add contact" and changing your mind should not block the save, and must not
+        // trip the "a contact needs an email" check either.
+        Assert.Equal("Dana Reed", Assert.Single(reloaded.Contacts).Name);
     }
 
     [Fact]
@@ -382,15 +408,12 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
     {
         var vm = NewFilledEditor();
         vm.AddContactCommand.Execute(null);
-        vm.AddSubmittedItemCommand.Execute(null);
 
-        // The commands are bound with a CommandParameter that can be null while a row is being
+        // The command is bound with a CommandParameter that can be null while a row is being
         // recycled by the virtualising panel.
         vm.RemoveContactCommand.Execute(null);
-        vm.RemoveSubmittedItemCommand.Execute(null);
 
         Assert.Single(vm.Contacts);
-        Assert.Single(vm.SubmittedItems);
     }
 
     [Fact]
@@ -401,11 +424,5 @@ public class ApplicationEditorViewModelTests : ViewModelTestBase
         vm.CancelCommand.Execute(null);
 
         Assert.Equal(1, Navigation.ApplicationsCount);
-    }
-
-    private async Task<IReadOnlyList<Core.Entities.Application>> AllAsync()
-    {
-        await using var scope = Repositories.Create();
-        return await scope.Repository.QueryAsync(new Core.Abstractions.ApplicationFilter());
     }
 }

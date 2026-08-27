@@ -130,11 +130,6 @@
                                     <TextBlock Text="{Binding Location}"
                                                Style="{StaticResource MutedText}"
                                                Visibility="{Binding Location, Converter={StaticResource Truthy}}" />
-                                    <TextBlock Text="&#160;&#183;&#160;" Style="{StaticResource MutedText}"
-                                               Visibility="{Binding SalaryRange, Converter={StaticResource Truthy}}" />
-                                    <TextBlock Text="{Binding SalaryRange}"
-                                               Style="{StaticResource MutedText}"
-                                               Visibility="{Binding SalaryRange, Converter={StaticResource Truthy}}" />
                                 </StackPanel>
                             </StackPanel>
 
@@ -183,6 +178,33 @@
                     <TextBlock Text="CURRENT STAGE" Style="{StaticResource FieldLabelText}" />
                     <ContentControl Content="{Binding Status}"
                                     ContentTemplate="{StaticResource StatusBadgeTemplate}" />
+
+                    <StackPanel Margin="0,16,0,0">
+                        <TextBlock Text="SUBMITTED" Style="{StaticResource FieldLabelText}" />
+
+                        <!-- A tick and a dash rather than only listing what was sent: "no cover
+                             letter" and "never recorded" are different answers, and the pane has
+                             to give the first one. -->
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#x2713;" FontSize="12.5"
+                                       Foreground="{StaticResource AccentBrush}"
+                                       Visibility="{Binding ResumeSubmitted, Converter={StaticResource Truthy}}" />
+                            <TextBlock Text="&#x2014;" Style="{StaticResource MutedText}" FontSize="12.5"
+                                       Visibility="{Binding ResumeSubmitted, Converter={StaticResource Truthy}, ConverterParameter=Invert}" />
+                            <TextBlock Text="Resume" Style="{StaticResource MutedText}"
+                                       FontSize="12.5" Margin="8,0,0,0" />
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                            <TextBlock Text="&#x2713;" FontSize="12.5"
+                                       Foreground="{StaticResource AccentBrush}"
+                                       Visibility="{Binding CoverLetterSubmitted, Converter={StaticResource Truthy}}" />
+                            <TextBlock Text="&#x2014;" Style="{StaticResource MutedText}" FontSize="12.5"
+                                       Visibility="{Binding CoverLetterSubmitted, Converter={StaticResource Truthy}, ConverterParameter=Invert}" />
+                            <TextBlock Text="Cover letter" Style="{StaticResource MutedText}"
+                                       FontSize="12.5" Margin="8,0,0,0" />
+                        </StackPanel>
+                    </StackPanel>
 
                     <StackPanel Margin="0,16,0,0"
                                 Visibility="{Binding JobUrl, Converter={StaticResource Truthy}}">

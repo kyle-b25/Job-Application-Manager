@@ -50,10 +50,14 @@ public sealed class ApplicationBuilder
     public ApplicationBuilder AppliedOn(int year, int month, int day) =>
         AppliedOn(new DateOnly(year, month, day));
 
-    public ApplicationBuilder WithStatus(ApplicationStatus status, int? interviewRound = null)
+    public ApplicationBuilder WithStatus(
+        ApplicationStatus status,
+        int? interviewRound = null,
+        DateOnly? interviewDate = null)
     {
         _application.Status = status;
         _application.InterviewRound = interviewRound;
+        _application.InterviewDate = interviewDate;
         return this;
     }
 
@@ -75,30 +79,21 @@ public sealed class ApplicationBuilder
         return this;
     }
 
-    public ApplicationBuilder WithSalary(string? salaryRange)
-    {
-        _application.SalaryRange = salaryRange;
-        return this;
-    }
-
     public ApplicationBuilder WithNotes(string? notes)
     {
         _application.Notes = notes;
         return this;
     }
 
-    public ApplicationBuilder WithSubmittedItem(
-        string name,
-        SubmissionKind kind = SubmissionKind.Resume,
-        DateOnly? submittedOn = null)
+    public ApplicationBuilder WithResume(bool submitted = true)
     {
-        _application.SubmittedItems.Add(new SubmittedItem
-        {
-            Kind = kind,
-            Name = name,
-            SubmittedOn = submittedOn
-        });
+        _application.ResumeSubmitted = submitted;
+        return this;
+    }
 
+    public ApplicationBuilder WithCoverLetter(bool submitted = true)
+    {
+        _application.CoverLetterSubmitted = submitted;
         return this;
     }
 

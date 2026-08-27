@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows;
 using JobAppManager.App.Converters;
+using JobAppManager.Core.Abstractions;
 using JobAppManager.Core.Enums;
 using Xunit;
 
@@ -13,18 +14,20 @@ namespace JobAppManager.App.Tests;
 public class EnumDisplayNameConverterTests
 {
     [Theory]
-    [InlineData(ApplicationStatus.PhoneScreen, "Phone Screen")]
-    [InlineData(ApplicationStatus.Wishlist, "Wishlist")]
     [InlineData(ApplicationStatus.Applied, "Applied")]
-    [InlineData(ApplicationStatus.Withdrawn, "Withdrawn")]
-    public void Humanize_SplitsPascalCaseIntoWords(ApplicationStatus status, string expected) =>
+    [InlineData(ApplicationStatus.Interview, "Interview")]
+    [InlineData(ApplicationStatus.Rejected, "Rejected")]
+    public void Humanize_NamesEveryStage(ApplicationStatus status, string expected) =>
         Assert.Equal(expected, EnumDisplayNameConverter.Humanize(status));
 
+    // No status is PascalCase any more, but the sort dropdown still renders one, so the split
+    // has to keep working somewhere the UI actually depends on it.
     [Theory]
-    [InlineData(SubmissionKind.CoverLetter, "Cover Letter")]
-    [InlineData(SubmissionKind.Resume, "Resume")]
-    public void Humanize_WorksForEveryEnumInTheUi(SubmissionKind kind, string expected) =>
-        Assert.Equal(expected, EnumDisplayNameConverter.Humanize(kind));
+    [InlineData(ApplicationSortField.DateApplied, "Date Applied")]
+    [InlineData(ApplicationSortField.CompanyName, "Company Name")]
+    [InlineData(ApplicationSortField.Location, "Location")]
+    public void Humanize_SplitsPascalCaseIntoWords(ApplicationSortField field, string expected) =>
+        Assert.Equal(expected, EnumDisplayNameConverter.Humanize(field));
 
     [Fact]
     public void Humanize_ReturnsEmpty_ForNull() =>
@@ -147,7 +150,7 @@ public class StatusBrushConverterTests
         // No WPF Application exists in a test host, so every resource lookup misses. The
         // converter has to survive that - a thrown converter takes the whole binding down.
         var exception = Record.Exception(() => new StatusBrushConverter()
-            .Convert(ApplicationStatus.Offer, typeof(object), null, CultureInfo.InvariantCulture));
+            .Convert(ApplicationStatus.Rejected, typeof(object), null, CultureInfo.InvariantCulture));
 
         Assert.Null(exception);
     }

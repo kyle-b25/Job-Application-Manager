@@ -59,19 +59,19 @@ public class StageAnalyticsTests : IDisposable
         Assert.Equal(0, stats.TotalApplications);
         Assert.Equal(0, stats.ActiveApplications);
         Assert.Equal(0d, stats.InterviewRate);
-        Assert.Equal(0d, stats.OfferRate);
+        Assert.Equal(0d, stats.RejectionRate);
         Assert.Empty(stats.AverageDaysInStage);
         Assert.Empty(stats.MonthlyCounts);
     }
 
     [Fact]
-    public async Task ActiveApplications_ExcludesRejectedAndWithdrawn()
+    public async Task ActiveApplications_ExcludesRejected()
     {
         await AddAsync("Alpha", ApplicationStatus.Applied);
         await AddAsync("Beta", ApplicationStatus.Interview);
         await AddAsync("Gamma", ApplicationStatus.Rejected);
-        await AddAsync("Delta", ApplicationStatus.Withdrawn);
-        await AddAsync("Epsilon", ApplicationStatus.Wishlist);
+        await AddAsync("Delta", ApplicationStatus.Rejected);
+        await AddAsync("Epsilon", ApplicationStatus.Applied);
 
         var stats = await StatisticsAsync();
 
@@ -88,32 +88,31 @@ public class StageAnalyticsTests : IDisposable
 
         await AddAsync("Beta", ApplicationStatus.Applied);
 
-        var offered = await AddAsync("Gamma", ApplicationStatus.Applied);
-        await MoveAfterAsync(offered, 20, ApplicationStatus.Offer);
-
-        // Never submitted anywhere, so it must not dilute either denominator.
-        await AddAsync("Delta", ApplicationStatus.Wishlist);
+        var interviewing = await AddAsync("Gamma", ApplicationStatus.Applied);
+        await MoveAfterAsync(interviewing, 20, ApplicationStatus.Interview);
 
         var stats = await StatisticsAsync();
 
-        // 3 submitted; 2 of them reached an interview stage, 1 reached an offer. The rejected one
-        // still counts as an interview reached - that is the point of reading the history.
+        // 3 applications; 2 of them reached Interview, 1 of them reached Rejected. Alpha counts
+        // in both - it interviewed and *then* got rejected, and reading the history is the only
+        // way to see that from a row whose current status is only the second of those.
         Assert.Equal(2d / 3d, stats.InterviewRate, 6);
-        Assert.Equal(1d / 3d, stats.OfferRate, 6);
+        Assert.Equal(1d / 3d, stats.RejectionRate, 6);
     }
 
     [Fact]
-    public async Task InterviewRate_IsZero_WhenNothingHasBeenSubmitted()
+    public async Task Rates_AreZero_WhenNothingHasMovedPastApplied()
     {
-        await AddAsync("Alpha", ApplicationStatus.Wishlist);
-        await AddAsync("Beta", ApplicationStatus.Wishlist);
+        await AddAsync("Alpha", ApplicationStatus.Applied);
+        await AddAsync("Beta", ApplicationStatus.Applied);
 
         var stats = await StatisticsAsync();
 
-        // Denominator zero: a wishlist of two is not a 0-for-2 record, and must not divide by zero.
+        // A real 0-for-2 record this time - the denominator is every application, since there is
+        // no longer a stage that means "not sent anywhere yet".
         Assert.Equal(2, stats.TotalApplications);
         Assert.Equal(0d, stats.InterviewRate);
-        Assert.Equal(0d, stats.OfferRate);
+        Assert.Equal(0d, stats.RejectionRate);
     }
 
     [Fact]
@@ -152,27 +151,23 @@ public class StageAnalyticsTests : IDisposable
     [Fact]
     public async Task AverageDaysInStage_ReportsEveryCompletedStageInPipelineOrder()
     {
-        var id = await AddAsync("Alpha", ApplicationStatus.Wishlist);
+        var id = await AddAsync("Alpha", ApplicationStatus.Applied);
 
-        await MoveAfterAsync(id, 2, ApplicationStatus.Applied);
-        await MoveAfterAsync(id, 8, ApplicationStatus.PhoneScreen);
-        await MoveAfterAsync(id, 5, ApplicationStatus.Interview);
-        await MoveAfterAsync(id, 12, ApplicationStatus.Offer);
+        await MoveAfterAsync(id, 8, ApplicationStatus.Interview);
+        await MoveAfterAsync(id, 12, ApplicationStatus.Rejected);
 
         var stats = await StatisticsAsync();
 
         Assert.Equal(
             new[]
             {
-                (ApplicationStatus.Wishlist, 2d),
                 (ApplicationStatus.Applied, 8d),
-                (ApplicationStatus.PhoneScreen, 5d),
                 (ApplicationStatus.Interview, 12d)
             },
             stats.AverageDaysInStage.Select(d => (d.Stage, d.AverageDays)));
 
-        // Offer is the stage it is sitting in now, so it has no completed stint to average.
-        Assert.DoesNotContain(stats.AverageDaysInStage, d => d.Stage == ApplicationStatus.Offer);
+        // Rejected is the stage it is sitting in now, so it has no completed stint to average.
+        Assert.DoesNotContain(stats.AverageDaysInStage, d => d.Stage == ApplicationStatus.Rejected);
     }
 
     [Fact]
@@ -180,12 +175,12 @@ public class StageAnalyticsTests : IDisposable
     {
         var id = await AddAsync("Alpha", ApplicationStatus.Applied);
 
-        await MoveAfterAsync(id, 6, ApplicationStatus.PhoneScreen);
+        await MoveAfterAsync(id, 6, ApplicationStatus.Interview);
 
         // Same instant: someone advancing two stages in one sitting. Without the ThenBy(Id)
         // tie-break the pairing order would be undefined and the zero-length stint could be
         // attributed to the wrong stage.
-        await MoveAfterAsync(id, 0, ApplicationStatus.Interview);
+        await MoveAfterAsync(id, 0, ApplicationStatus.Rejected);
 
         var stats = await StatisticsAsync();
 
@@ -193,7 +188,7 @@ public class StageAnalyticsTests : IDisposable
             new[]
             {
                 (ApplicationStatus.Applied, 6d),
-                (ApplicationStatus.PhoneScreen, 0d)
+                (ApplicationStatus.Interview, 0d)
             },
             stats.AverageDaysInStage.Select(d => (d.Stage, d.AverageDays)));
     }

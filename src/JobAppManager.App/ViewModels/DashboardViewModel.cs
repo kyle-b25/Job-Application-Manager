@@ -13,6 +13,10 @@ using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore.SkiaSharpView.Painting;
 using SkiaSharp;
 
+// System.Windows.Application is already in scope here for the resource lookups the charts do,
+// so the entity gets an alias rather than an ambiguous import.
+using JobApplication = JobAppManager.Core.Entities.Application;
+
 namespace JobAppManager.App.ViewModels;
 
 public partial class DashboardViewModel : PageViewModel
@@ -29,21 +33,76 @@ public partial class DashboardViewModel : PageViewModel
         _repositories = repositories;
         _navigation = navigation;
         _timeProvider = timeProvider ?? TimeProvider.System;
+
+        InterestLevels = Enum.GetValues<InterestLevel>();
     }
 
-    public override string Title => Greeting;
+    public override string Title => "Dashboard";
 
     public override string? Subtitle => TotalApplications == 0
         ? null
         : $"{ActiveApplications} still in play out of {TotalApplications} tracked.";
 
-    /// <summary>Time-of-day greeting, per the SRS main menu.</summary>
-    public string Greeting => _timeProvider.GetLocalNow().Hour switch
+    /// <summary>Today on the injected clock - the date a quick-submitted application gets.</summary>
+    private DateOnly Today => DateOnly.FromDateTime(_timeProvider.GetLocalNow().DateTime);
+
+    // ---------------- Quick submit ----------------
+
+    public IReadOnlyList<InterestLevel> InterestLevels { get; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanQuickSubmit))]
+    [NotifyCanExecuteChangedFor(nameof(QuickSubmitCommand))]
+    private string _quickCompany = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanQuickSubmit))]
+    [NotifyCanExecuteChangedFor(nameof(QuickSubmitCommand))]
+    private string _quickJobTitle = string.Empty;
+
+    [ObservableProperty]
+    private string _quickLocation = string.Empty;
+
+    [ObservableProperty]
+    private InterestLevel _quickInterest = InterestLevel.Yellow;
+
+    /// <summary>Company and title are the two fields the entity actually requires; everything
+    /// else on the form has a sensible default, which is the point of a quick submit.</summary>
+    public bool CanQuickSubmit =>
+        !string.IsNullOrWhiteSpace(QuickCompany)
+        && !string.IsNullOrWhiteSpace(QuickJobTitle)
+        && !IsBusy;
+
+    /// <summary>Adds an application dated today, straight from the dashboard. It goes in as
+    /// Applied through <see cref="IApplicationRepository.AddAsync"/>, which seeds the opening
+    /// status-history entry - so the new row counts in every statistic on this page immediately.</summary>
+    [RelayCommand(CanExecute = nameof(CanQuickSubmit))]
+    private async Task QuickSubmitAsync()
     {
-        < 12 => "Good morning",
-        < 18 => "Good afternoon",
-        _ => "Good evening"
-    };
+        var application = new JobApplication
+        {
+            CompanyName = QuickCompany.Trim(),
+            JobTitle = QuickJobTitle.Trim(),
+            Location = QuickLocation?.Trim() ?? string.Empty,
+            InterestLevel = QuickInterest,
+            DateApplied = Today,
+            Status = ApplicationStatus.Applied
+        };
+
+        await using (var scope = _repositories.Create())
+        {
+            await scope.Repository.AddAsync(application);
+        }
+
+        QuickCompany = string.Empty;
+        QuickJobTitle = string.Empty;
+        QuickLocation = string.Empty;
+        QuickInterest = InterestLevel.Yellow;
+
+        // Re-read rather than incrementing by hand: the charts, the rates, and the stage
+        // breakdown all have to move together, and the repository is the only thing that knows how.
+        await ActivateAsync();
+    }
 
     [ObservableProperty]
     private int _totalApplications;
@@ -55,7 +114,7 @@ public partial class DashboardViewModel : PageViewModel
     private double _interviewRate;
 
     [ObservableProperty]
-    private double _offerRate;
+    private double _rejectionRate;
 
     [ObservableProperty]
     private int _appliedLast7Days;
@@ -109,7 +168,7 @@ public partial class DashboardViewModel : PageViewModel
             TotalApplications = stats.TotalApplications;
             ActiveApplications = stats.ActiveApplications;
             InterviewRate = stats.InterviewRate;
-            OfferRate = stats.OfferRate;
+            RejectionRate = stats.RejectionRate;
             AppliedLast7Days = stats.AppliedLast7Days;
             AppliedLast30Days = stats.AppliedLast30Days;
 
@@ -122,12 +181,14 @@ public partial class DashboardViewModel : PageViewModel
             IsBusy = false;
             OnPropertyChanged(nameof(IsEmpty));
             OnPropertyChanged(nameof(HasData));
-            OnPropertyChanged(nameof(Greeting));
-            OnPropertyChanged(nameof(Title));
             OnPropertyChanged(nameof(Subtitle));
+            OnPropertyChanged(nameof(CanQuickSubmit));
+            QuickSubmitCommand.NotifyCanExecuteChanged();
         }
     }
 
+    /// <summary>The empty state offers the full editor for anyone who wants more than the four
+    /// fields the quick-submit box above it asks for.</summary>
     [RelayCommand]
     private void AddFirst() => _navigation.GoToNewApplication();
 

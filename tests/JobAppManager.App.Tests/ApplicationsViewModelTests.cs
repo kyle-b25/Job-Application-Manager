@@ -240,10 +240,4 @@ public class ApplicationsViewModelTests : ViewModelTestBase
 
         Assert.Equal(1, Navigation.NewApplicationCount);
     }
-
-    private async Task<IReadOnlyList<Core.Entities.Application>> AllAsync()
-    {
-        await using var scope = Repositories.Create();
-        return await scope.Repository.QueryAsync(new ApplicationFilter());
-    }
 }

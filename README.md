@@ -4,8 +4,9 @@ A local Windows 11 desktop app for tracking a job hunt: what you applied to, whe
 application stands, and what the numbers say about how it is going. Everything lives in a SQLite
 file on your own machine — no account, no sync, no network calls.
 
-- **Dashboard** — greeting, total/active counts, interview and offer rates, applications over
-  time, a breakdown by stage, and the average days spent in each stage.
+- **Dashboard** — a quick-submit box that logs an application in four fields, plus the
+  analytics: total/active counts, interview and rejection rates, applications over time, a
+  breakdown by stage, and the average days spent in each stage.
 - **Applications** — searchable, filterable, sortable list with a detail pane and full CRUD.
 - **Add New / Edit** — one form for the role, the pipeline stage, what you sent, who you talked
   to, and a timeline of every stage change.
@@ -104,6 +105,6 @@ Two rules worth knowing before changing anything:
   current stage but leaves no history behind, which silently breaks the rates and the
   stage-duration chart.
 - **Read the clock through the injected `TimeProvider`,** not `DateTime.Now`. It is what makes the
-  statistics windows, the timestamps, and the dashboard greeting testable.
+  statistics windows, the timestamps, and the date a quick-submitted application gets testable.
 
 Charts use LiveCharts2 (`LiveChartsCore.SkiaSharpView.WPF`).

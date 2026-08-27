@@ -40,20 +40,12 @@
     <!-- Status palette. Cool-to-green as an application progresses, muted red for rejection,
          grey for the two stages that mean "not in play". Each stage gets a saturated foreground
          and a dim background so a badge reads at a glance without shouting. -->
-    <SolidColorBrush x:Key="StatusWishlistBrush" Color="#8B909B" />
-    <SolidColorBrush x:Key="StatusWishlistDimBrush" Color="#262A33" />
     <SolidColorBrush x:Key="StatusAppliedBrush" Color="#6C8CD5" />
     <SolidColorBrush x:Key="StatusAppliedDimBrush" Color="#1E2739" />
-    <SolidColorBrush x:Key="StatusPhoneScreenBrush" Color="#3FBFC4" />
-    <SolidColorBrush x:Key="StatusPhoneScreenDimBrush" Color="#16323A" />
     <SolidColorBrush x:Key="StatusInterviewBrush" Color="#3ECF8E" />
     <SolidColorBrush x:Key="StatusInterviewDimBrush" Color="#12332A" />
-    <SolidColorBrush x:Key="StatusOfferBrush" Color="#8BE86B" />
-    <SolidColorBrush x:Key="StatusOfferDimBrush" Color="#1E3319" />
     <SolidColorBrush x:Key="StatusRejectedBrush" Color="#E05561" />
     <SolidColorBrush x:Key="StatusRejectedDimBrush" Color="#33191D" />
-    <SolidColorBrush x:Key="StatusWithdrawnBrush" Color="#6B7080" />
-    <SolidColorBrush x:Key="StatusWithdrawnDimBrush" Color="#20242C" />
 
     <!-- Interest level: the SRS red/yellow/green. -->
     <SolidColorBrush x:Key="InterestRedBrush" Color="#E05561" />

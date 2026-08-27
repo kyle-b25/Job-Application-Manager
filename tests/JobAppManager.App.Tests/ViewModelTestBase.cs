@@ -1,5 +1,6 @@
 using JobAppManager.App.Services;
 using JobAppManager.App.ViewModels;
+using JobAppManager.Core.Abstractions;
 using JobAppManager.Core.Entities;
 using JobAppManager.Data.Repositories;
 using JobAppManager.TestSupport;
@@ -62,6 +63,13 @@ public abstract class ViewModelTestBase : IDisposable
     {
         await using var scope = Repositories.Create();
         return await scope.Repository.GetByIdAsync(id);
+    }
+
+    /// <summary>Everything in the database, unfiltered.</summary>
+    protected async Task<IReadOnlyList<Application>> AllAsync()
+    {
+        await using var scope = Repositories.Create();
+        return await scope.Repository.QueryAsync(new ApplicationFilter());
     }
 
     public void Dispose() => Fixture.Dispose();

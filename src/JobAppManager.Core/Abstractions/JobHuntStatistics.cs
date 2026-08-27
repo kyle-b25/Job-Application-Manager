@@ -7,17 +7,17 @@ public record JobHuntStatistics
 {
     public int TotalApplications { get; init; }
 
-    /// <summary>Applications still in play: anything not Rejected or Withdrawn.</summary>
+    /// <summary>Applications still in play: anything not Rejected.</summary>
     public int ActiveApplications { get; init; }
 
-    /// <summary>Share of submitted applications that reached PhoneScreen or beyond, 0..1.
-    /// Wishlist entries are excluded from the denominator - they were never sent anywhere.
-    /// Zero when nothing has been submitted.</summary>
+    /// <summary>Share of applications that ever reached Interview, 0..1. Every application was
+    /// sent somewhere, so the denominator is all of them. Zero on an empty database.</summary>
     public double InterviewRate { get; init; }
 
-    /// <summary>Share of submitted applications that reached Offer, 0..1. Same denominator
-    /// as <see cref="InterviewRate"/>.</summary>
-    public double OfferRate { get; init; }
+    /// <summary>Share of applications that ever reached Rejected, 0..1. Same denominator as
+    /// <see cref="InterviewRate"/>. Answered from history, so an application does not have to
+    /// still be sitting in Rejected to count.</summary>
+    public double RejectionRate { get; init; }
 
     /// <summary>Count per status. Contains an entry for every <see cref="ApplicationStatus"/>,
     /// zero included, so callers never have to handle a missing key.</summary>
