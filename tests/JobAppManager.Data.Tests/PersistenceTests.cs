@@ -1,3 +1,5 @@
+using JobAppManager.TestSupport;
+using JobAppManager.Core.Entities;
 using JobAppManager.Core.Enums;
 using JobAppManager.Data.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -91,48 +93,93 @@ public class PersistenceTests : IClassFixture<SqliteTestFixture>
     }
 
     [Fact]
-    public async Task Add_StampsCreatedAndUpdatedTimestamps()
-    {
-        await using var context = _fixture.CreateContext();
-        var before = DateTime.UtcNow.AddSeconds(-1);
-
-        var saved = await new ApplicationRepository(context)
-            .AddAsync(TestData.Minimal("Stamp Co", new DateOnly(2026, 8, 1)));
-
-        Assert.InRange(saved.CreatedUtc, before, DateTime.UtcNow.AddSeconds(1));
-        Assert.Equal(saved.CreatedUtc, saved.UpdatedUtc);
-    }
-
-    [Fact]
-    public async Task Update_AdvancesUpdatedUtc_AndPreservesCreatedUtc()
+    public async Task Update_PersistsThroughADetachedGraph()
     {
         int id;
-        DateTime createdUtc;
 
         await using (var context = _fixture.CreateContext())
         {
             var saved = await new ApplicationRepository(context)
-                .AddAsync(TestData.Minimal("Update Co", new DateOnly(2026, 8, 2)));
+                .AddAsync(TestData.Minimal("Detached Co", new DateOnly(2026, 8, 2)));
             id = saved.Id;
-            createdUtc = saved.CreatedUtc;
         }
 
-        // A detached graph, the way a UI layer would hand one back.
+        // Loaded on one context and saved through another, which is the shape the UI produces
+        // and the only way UpdateAsync's Detached branch is actually reached. Loading and saving
+        // on the *same* context leaves the entity tracked and quietly skips that branch.
+        Application detached;
+
         await using (var context = _fixture.CreateContext())
         {
-            var repository = new ApplicationRepository(context);
-            var loaded = await repository.GetByIdAsync(id);
-            loaded!.Status = ApplicationStatus.Rejected;
-            await repository.UpdateAsync(loaded);
+            detached = (await new ApplicationRepository(context).GetByIdAsync(id))!;
+        }
+
+        detached.CompanyName = "Detached Co (renamed)";
+        detached.Location = "Remote - EU";
+
+        await using (var context = _fixture.CreateContext())
+        {
+            await new ApplicationRepository(context).UpdateAsync(detached);
         }
 
         await using (var context = _fixture.CreateContext())
         {
             var reloaded = await context.Applications.FindAsync(id);
 
-            Assert.Equal(ApplicationStatus.Rejected, reloaded!.Status);
-            Assert.Equal(createdUtc, reloaded.CreatedUtc);
-            Assert.True(reloaded.UpdatedUtc >= createdUtc);
+            Assert.Equal("Detached Co (renamed)", reloaded!.CompanyName);
+            Assert.Equal("Remote - EU", reloaded.Location);
+        }
+    }
+
+    [Fact]
+    public async Task Update_AddsEditsAndRemovesChildrenInOneSave()
+    {
+        int id;
+
+        await using (var context = _fixture.CreateContext())
+        {
+            var saved = await new ApplicationRepository(context).AddAsync(
+                ApplicationBuilder.An()
+                    .At("Children Co")
+                    .AppliedOn(2026, 8, 4)
+                    .WithContact("Keep Me", "keep@example.com", "Recruiter")
+                    .WithContact("Remove Me", "remove@example.com")
+                    .Build());
+
+            id = saved.Id;
+        }
+
+        int keptContactId;
+
+        await using (var context = _fixture.CreateContext())
+        {
+            var repository = new ApplicationRepository(context);
+            var loaded = (await repository.GetByIdAsync(id))!;
+
+            var kept = loaded.Contacts.Single(c => c.Name == "Keep Me");
+            keptContactId = kept.Id;
+            kept.Role = "Hiring Manager";
+
+            loaded.Contacts.Remove(loaded.Contacts.Single(c => c.Name == "Remove Me"));
+            loaded.Contacts.Add(new Contact { Name = "New Person", Email = "new@example.com" });
+
+            await repository.UpdateAsync(loaded);
+        }
+
+        await using (var context = _fixture.CreateContext())
+        {
+            var reloaded = (await new ApplicationRepository(context).GetByIdAsync(id))!;
+
+            Assert.Equal(2, reloaded.Contacts.Count);
+
+            // The edited row keeps its identity rather than being deleted and reinserted - which
+            // is what the editor's SyncChildren relies on to avoid churning ids on every save.
+            var kept = reloaded.Contacts.Single(c => c.Name == "Keep Me");
+            Assert.Equal(keptContactId, kept.Id);
+            Assert.Equal("Hiring Manager", kept.Role);
+
+            Assert.Contains(reloaded.Contacts, c => c.Name == "New Person");
+            Assert.DoesNotContain(reloaded.Contacts, c => c.Name == "Remove Me");
         }
     }
 }

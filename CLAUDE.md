@@ -5,11 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project
 
 A local Windows 11 job-application tracker with persistent SQLite storage, built to the SRS
-(rev 1.0). Three planned screens: a main menu (greeting + hunt statistics and graphs), an
-add-application page, and a sortable/filterable spreadsheet page.
+(rev 1.0). Three screens: a dashboard (greeting + hunt statistics and graphs), an add/edit
+application page, and a sortable/filterable applications list.
 
-**Current state: data layer only.** There is no UI yet. WPF on .NET 8 is the chosen UI stack
-but no WPF project exists — do not assume one.
+**Current state: complete.** WPF on .NET 8, MVVM via CommunityToolkit.Mvvm, charts via
+LiveCharts2. All three screens exist and the app ships with no seed data.
 
 ## Commands
 
@@ -18,6 +18,7 @@ Run from the repo root. If `dotnet` is not found, the SDK is at `C:\Program File
 
 ```powershell
 dotnet build JobApplicationManager.sln
+dotnet run --project src\JobAppManager.App
 dotnet test JobApplicationManager.sln
 
 # A single test
@@ -25,6 +26,9 @@ dotnet test --filter "FullyQualifiedName~PersistenceTests.Application_SurvivesCo
 
 # A whole test class
 dotnet test --filter "FullyQualifiedName~StatisticsTests"
+
+# One project
+dotnet test tests\JobAppManager.App.Tests
 ```
 
 ### Migrations
@@ -46,23 +50,38 @@ on the **real** user database, not a test one.
 ```
 src/JobAppManager.Core/   entities, enums, repository interface — NO EF Core dependency
 src/JobAppManager.Data/   DbContext, entity configurations, migrations, repository impl
+src/JobAppManager.App/    WPF: /ViewModels /Views /Services /Styles /Converters
 tests/JobAppManager.Data.Tests/
 ```
 
-**Core must stay free of EF Core.** That's the point of the two-project split: the future WPF
-layer references only `Core`, binds to the entities directly, and depends on
-`IApplicationRepository` rather than on `JobAppContext`. Putting an EF attribute or `using
-Microsoft.EntityFrameworkCore` in `Core` defeats it — mapping concerns belong in
-`Data/Configurations/`, one `IEntityTypeConfiguration<T>` per entity, picked up automatically
-by `ApplyConfigurationsFromAssembly`.
+**Core must stay free of EF Core.** That's the point of the project split: the WPF layer binds to
+the entities directly and depends on `IApplicationRepository` rather than on `JobAppContext`.
+Putting an EF attribute or `using Microsoft.EntityFrameworkCore` in `Core` defeats it — mapping
+concerns belong in `Data/Configurations/`, one `IEntityTypeConfiguration<T>` per entity, picked up
+automatically by `ApplyConfigurationsFromAssembly`. `App` references `Data` only in
+`App.xaml.cs`, to wire the container.
 
 **Data model.** `Application` is the root; `SubmittedItem` (what was sent to the recruiter, by
-name) and `Contact` (people messaged) are child tables with cascade delete, not columns,
-because the SRS allows an open-ended set of each. Interview rounds are `Status = Interview`
-plus an `InterviewRound` int, not one status per round.
+name), `Contact` (people messaged), and `StatusChange` (the stage history) are child tables with
+cascade delete, not columns. Interview rounds are `Status = Interview` plus an `InterviewRound`
+int, not one status per round.
+
+**The pipeline is a history, not a column.** `ApplicationStatus` runs
+Wishlist → Applied → PhoneScreen → Interview → Offer, plus Rejected and Withdrawn, which anything
+can reach at any point. `Application.Status` is only the latest entry — **always move an
+application with `IApplicationRepository.ChangeStatusAsync`**, never by assigning `Status`.
+Assigning it directly leaves no `StatusChange` behind, and the interview/offer rates and the
+stage-duration chart are computed entirely from that history.
 
 **Timestamps are automatic.** `JobAppContext.StampTimestamps` sets `CreatedUtc`/`UpdatedUtc` on
-save and explicitly un-modifies `CreatedUtc` on updates. Never assign either by hand.
+save, explicitly un-modifies `CreatedUtc` on updates, and stamps `StatusChange.ChangedUtc` on
+insert. Never assign any of them by hand.
+
+**Time comes from an injected `TimeProvider`.** `JobAppContext`, `ApplicationRepository`,
+`RepositoryFactory`, `DashboardViewModel`, and `ApplicationEditorViewModel` all take one, defaulting
+to `TimeProvider.System`; the container registers a single instance. Do not reintroduce a direct
+`DateTime.Now`/`UtcNow` read — it is the seam that makes the statistics windows, the timestamps, and
+the greeting testable.
 
 **Database location:** `%LOCALAPPDATA%\JobApplicationManager\jobapps.db`, resolved by
 `DbPathProvider`. Startup path is `DatabaseInitializer.CreateAndMigrate()`, which applies
@@ -71,13 +90,60 @@ pending migrations. Use migrations, never `EnsureCreated` — the schema is expe
 **Repository queries.** `QueryAsync(ApplicationFilter)` backs the spreadsheet page: all filters
 optional, combined with AND, sorts always tie-broken by `Id` for determinism. Text filters use
 `EF.Functions.Like`, not `Contains` — EF translates `Contains` to SQLite's `instr()`, which is
-case-sensitive, and a search box should not be. `GetStatisticsAsync` aggregates in SQL and
-zero-fills every enum member so the UI never handles a missing dictionary key.
+case-sensitive, and a search box should not be. Search terms go through `ToLikePattern`, which
+escapes `%`, `_`, and the escape character itself and declares `ESCAPE` on the call — otherwise a
+user typing `%` matches every row. `GetStatisticsAsync` aggregates in SQL and
+zero-fills every enum member so the UI never handles a missing dictionary key. It deliberately
+omits empty days, empty months, and stages nothing has left — the chart layer fills those gaps,
+because a fabricated zero and "no data yet" are different statements.
 
 ## Tests
 
+```
+tests/JobAppManager.TestSupport/   SqliteTestFixture, FixedClock, ApplicationBuilder, TestData
+tests/JobAppManager.Data.Tests/    repository, persistence, statistics, status history
+tests/JobAppManager.App.Tests/     ViewModels, converters, navigation  (net8.0-windows, UseWPF)
+```
+
 xUnit against a **file-backed temp SQLite database** (`SqliteTestFixture`), not the in-memory
-provider — cascade deletes behave differently there, and "persists through shutdown" can only
-be proven by disposing a context and reopening the same file. `ApplicationRepositoryTests` and
-`StatisticsTests` construct their own fixture per test for isolation; `PersistenceTests` shares
-one via `IClassFixture` and scopes its assertions by id.
+provider - cascade deletes behave differently there, and "persists through shutdown" can only be
+proven by disposing a context and reopening the same file. Most classes construct their own
+fixture per test for isolation; `PersistenceTests` shares one via `IClassFixture` and scopes its
+assertions by id. `SqliteTestFixture` has exactly one public constructor on purpose - xUnit
+refuses a class fixture with more than one, or with optional parameters - so the clock variant is
+the static `SqliteTestFixture.WithClock(...)`.
+
+**Use `FixedClock` for anything time-dependent.** Pass it to the fixture and to the repository, and
+the "last N days" windows, the stamped timestamps, and the dashboard greeting all become exact
+instead of tolerance-banded. It also pins the local timezone to UTC so results do not move with the
+machine. To build an application that sat in a stage for eleven days, advance the clock between
+real `ChangeStatusAsync` calls - never insert history rows with raw SQL, which skips the code path
+the app actually uses.
+
+**ViewModel tests are integration tests by design.** They run against a real `RepositoryFactory`
+over a real SQLite file (`ViewModelTestBase`), because a fake `IApplicationRepository` would have to
+re-implement the filtering, sorting, and statistics logic and would then pass while the real SQL was
+wrong. Only `INavigationService` and `IDialogService` are substituted, by the hand-written recording
+fakes in `Fakes.cs`. `ViewModelTestBase`'s clock is set later than every default seed date, because
+the editor refuses to save an application dated in the future.
+
+Package versions live in `Directory.Packages.props`, not in the csproj files. Coverage:
+`dotnet test --collect:"XPlat Code Coverage"`.
+
+## UI
+
+Theme lives entirely in `src/JobAppManager.App/Styles/`. `Colors.xaml` is the only file with
+literal hex in it; everything else references its keys. Controls are restyled with full
+`ControlTemplate`s rather than property setters — WPF's stock chrome survives setters, and that is
+the main way an app still looks default.
+
+**Binding gotchas this codebase already worked around:**
+
+- List rows are `ApplicationRowViewModel`, which carries its own `EditCommand`/`DeleteCommand`.
+  Do not reach back to the page with a `RelativeSource AncestorType` binding from inside an item
+  template — when that resolves to null the buttons still hover and press, and silently do nothing.
+- The custom `ComboBox` template binds its selection box to `ItemTemplate`, not
+  `SelectionBoxItemTemplate`, so every `ComboBox` sets an explicit `ItemTemplate` rather than
+  `DisplayMemberPath`. With `DisplayMemberPath` the selected item renders as its `ToString()`.
+- Entities are plain POCOs with no `INotifyPropertyChanged`. The editor copies fields in and out
+  of an `ObservableValidator` rather than binding a form straight to an `Application`.

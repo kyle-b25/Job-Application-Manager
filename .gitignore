@@ -19,3 +19,7 @@ artifacts/
 # Test results
 [Tt]est[Rr]esult*/
 *.trx
+
+# Test run artifacts
+TestResults/
+*.cobertura.xml

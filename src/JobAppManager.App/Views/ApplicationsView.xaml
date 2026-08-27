@@ -1,0 +1,268 @@
+<UserControl x:Class="JobAppManager.App.Views.ApplicationsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:JobAppManager.App.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:ApplicationsViewModel}">
+
+    <Grid Margin="32,28,32,28">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- ==================== Header ==================== -->
+        <Grid Grid.Row="0">
+            <StackPanel>
+                <TextBlock Text="{Binding Title}" Style="{StaticResource PageTitleText}" />
+                <TextBlock Text="{Binding Subtitle}" Style="{StaticResource PageSubtitleText}"
+                           Visibility="{Binding Subtitle, Converter={StaticResource Truthy}}" />
+            </StackPanel>
+
+            <Button Content="Add application"
+                    Style="{StaticResource PrimaryButton}"
+                    HorizontalAlignment="Right" VerticalAlignment="Top"
+                    Command="{Binding AddNewCommand}" />
+        </Grid>
+
+        <!-- ==================== Filter bar ==================== -->
+        <Grid Grid.Row="1" Margin="0,22,0,16"
+              Visibility="{Binding HasAnyApplications, Converter={StaticResource Truthy}}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Grid Grid.Column="0" MaxWidth="420" HorizontalAlignment="Left">
+                <TextBox Style="{StaticResource FieldTextBox}"
+                         Padding="34,8,10,8"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged, Delay=0}" />
+
+                <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="13"
+                           Foreground="{StaticResource TextFaintBrush}"
+                           Margin="12,0,0,0"
+                           HorizontalAlignment="Left" VerticalAlignment="Center"
+                           IsHitTestVisible="False" />
+
+                <!-- Placeholder, shown only while the box is empty. -->
+                <TextBlock Text="Search company or job title"
+                           Foreground="{StaticResource TextFaintBrush}"
+                           FontSize="13"
+                           Margin="35,0,0,0"
+                           HorizontalAlignment="Left" VerticalAlignment="Center"
+                           IsHitTestVisible="False"
+                           Visibility="{Binding SearchText, Converter={StaticResource Truthy}, ConverterParameter=Invert}" />
+            </Grid>
+
+            <ComboBox Grid.Column="1" Width="170" Margin="10,0,0,0"
+                      Style="{StaticResource FieldComboBox}"
+                      ItemsSource="{Binding StatusOptions}"
+                      SelectedItem="{Binding SelectedStatus}">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+
+            <ComboBox Grid.Column="2" Width="170" Margin="10,0,0,0"
+                      Style="{StaticResource FieldComboBox}"
+                      ItemsSource="{Binding SortOptions}"
+                      SelectedItem="{Binding SelectedSort}">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+
+            <Button Grid.Column="3" Margin="10,0,0,0"
+                    Content="Clear"
+                    Style="{StaticResource SecondaryButton}"
+                    Command="{Binding ClearFiltersCommand}" />
+        </Grid>
+
+        <!-- ==================== List + detail ==================== -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <ListBox Grid.Column="0"
+                     Style="{StaticResource PlainListBox}"
+                     ItemsSource="{Binding Results}"
+                     SelectedItem="{Binding SelectedRow}">
+                <ListBox.ItemTemplate>
+                    <!-- DataContext is an ApplicationRowViewModel: the entity hangs off
+                         Application, and the row's own commands need no ancestor lookup. -->
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center"
+                                        DataContext="{Binding Application}">
+                                <StackPanel Orientation="Horizontal">
+                                    <ContentControl Content="{Binding InterestLevel}"
+                                                    ContentTemplate="{StaticResource InterestDotTemplate}"
+                                                    Margin="0,0,9,0" />
+                                    <TextBlock Text="{Binding JobTitle}"
+                                               FontSize="14" FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="17,4,0,0">
+                                    <TextBlock Text="{Binding CompanyName}"
+                                               Style="{StaticResource MutedText}" />
+                                    <TextBlock Text="&#160;&#183;&#160;" Style="{StaticResource MutedText}"
+                                               Visibility="{Binding Location, Converter={StaticResource Truthy}}" />
+                                    <TextBlock Text="{Binding Location}"
+                                               Style="{StaticResource MutedText}"
+                                               Visibility="{Binding Location, Converter={StaticResource Truthy}}" />
+                                    <TextBlock Text="&#160;&#183;&#160;" Style="{StaticResource MutedText}"
+                                               Visibility="{Binding SalaryRange, Converter={StaticResource Truthy}}" />
+                                    <TextBlock Text="{Binding SalaryRange}"
+                                               Style="{StaticResource MutedText}"
+                                               Visibility="{Binding SalaryRange, Converter={StaticResource Truthy}}" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0"
+                                        DataContext="{Binding Application}">
+                                <ContentControl Content="{Binding Status}"
+                                                ContentTemplate="{StaticResource StatusBadgeTemplate}"
+                                                HorizontalAlignment="Right" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           FontSize="11.5"
+                                           Margin="0,5,2,0"
+                                           HorizontalAlignment="Right"
+                                           Text="{Binding DateApplied, StringFormat='Applied {0:d MMM yyyy}'}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Style="{StaticResource GhostButton}"
+                                        Content="&#xE70F;" FontFamily="Segoe MDL2 Assets" FontSize="13"
+                                        ToolTip="Edit"
+                                        Command="{Binding EditCommand}" />
+                                <Button Style="{StaticResource GhostButton}"
+                                        Margin="4,0,0,0"
+                                        Content="&#xE74D;" FontFamily="Segoe MDL2 Assets" FontSize="13"
+                                        ToolTip="Delete"
+                                        Foreground="{StaticResource DangerBrush}"
+                                        Command="{Binding DeleteCommand}" />
+                            </StackPanel>
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <!-- Detail pane: the status timeline for whatever row is selected. -->
+            <Border Grid.Column="1" Style="{StaticResource Card}"
+                    Width="300" Margin="16,0,0,0" VerticalAlignment="Top"
+                    Visibility="{Binding SelectedApplication, Converter={StaticResource Truthy}}">
+                <StackPanel DataContext="{Binding SelectedApplication}">
+                    <TextBlock Text="{Binding CompanyName}" Style="{StaticResource SectionTitleText}"
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding JobTitle}" Style="{StaticResource MutedText}"
+                               Margin="0,3,0,0" TextWrapping="Wrap" />
+
+                    <Border Height="1" Background="{StaticResource BorderHairlineBrush}"
+                            Margin="0,14,0,14" />
+
+                    <TextBlock Text="CURRENT STAGE" Style="{StaticResource FieldLabelText}" />
+                    <ContentControl Content="{Binding Status}"
+                                    ContentTemplate="{StaticResource StatusBadgeTemplate}" />
+
+                    <StackPanel Margin="0,16,0,0"
+                                Visibility="{Binding JobUrl, Converter={StaticResource Truthy}}">
+                        <TextBlock Text="POSTING" Style="{StaticResource FieldLabelText}" />
+                        <TextBlock TextTrimming="CharacterEllipsis">
+                            <Hyperlink NavigateUri="{Binding JobUrl}"
+                                       RequestNavigate="OnOpenLink"
+                                       Foreground="{StaticResource AccentBrush}"
+                                       TextDecorations="None">
+                                <TextBlock Text="{Binding JobUrl}" FontSize="12.5" />
+                            </Hyperlink>
+                        </TextBlock>
+                    </StackPanel>
+
+                    <StackPanel Margin="0,16,0,0"
+                                Visibility="{Binding Notes, Converter={StaticResource Truthy}}">
+                        <TextBlock Text="NOTES" Style="{StaticResource FieldLabelText}" />
+                        <TextBlock Text="{Binding Notes}" Style="{StaticResource MutedText}"
+                                   TextWrapping="Wrap" MaxHeight="140" />
+                    </StackPanel>
+
+                    <Button Content="Open full record"
+                            Style="{StaticResource SecondaryButton}"
+                            Margin="0,18,0,0"
+                            HorizontalAlignment="Stretch"
+                            Command="{Binding DataContext.SelectedRow.EditCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ==================== Empty states ==================== -->
+
+        <!-- Nothing has ever been added. An invitation, with the action right there. -->
+        <Border Grid.Row="2" Style="{StaticResource Card}"
+                MaxWidth="440" Padding="40,44"
+                VerticalAlignment="Center" HorizontalAlignment="Center"
+                Visibility="{Binding ShowEmptyDatabaseState, Converter={StaticResource Truthy}}">
+            <StackPanel HorizontalAlignment="Center">
+                <Border Width="66" Height="66" CornerRadius="33"
+                        Background="{StaticResource AccentDimBrush}"
+                        HorizontalAlignment="Center">
+                    <TextBlock Text="&#xE8A4;" FontFamily="Segoe MDL2 Assets"
+                               FontSize="27"
+                               Foreground="{StaticResource AccentBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+
+                <TextBlock Text="No applications yet"
+                           Style="{StaticResource SectionTitleText}"
+                           FontSize="17"
+                           Margin="0,20,0,0"
+                           HorizontalAlignment="Center" />
+
+                <TextBlock Style="{StaticResource MutedText}"
+                           Margin="0,8,0,0"
+                           TextAlignment="Center" TextWrapping="Wrap"
+                           Text="Track a role you have applied to - or one you are still eyeing up - and the dashboard starts filling in from there." />
+
+                <Button Content="Add your first application"
+                        Style="{StaticResource PrimaryButton}"
+                        Margin="0,24,0,0"
+                        HorizontalAlignment="Center"
+                        Command="{Binding AddNewCommand}" />
+            </StackPanel>
+        </Border>
+
+        <!-- There is data, the filter just excluded all of it. A quieter, different message. -->
+        <StackPanel Grid.Row="2"
+                    VerticalAlignment="Center" HorizontalAlignment="Center"
+                    Visibility="{Binding ShowNoMatchesState, Converter={StaticResource Truthy}}">
+            <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="22"
+                       Foreground="{StaticResource TextFaintBrush}"
+                       HorizontalAlignment="Center" />
+            <TextBlock Text="No applications match those filters"
+                       Style="{StaticResource MutedText}"
+                       Margin="0,12,0,0" HorizontalAlignment="Center" />
+            <Button Content="Clear filters"
+                    Style="{StaticResource SecondaryButton}"
+                    Margin="0,16,0,0" HorizontalAlignment="Center"
+                    Command="{Binding ClearFiltersCommand}" />
+        </StackPanel>
+    </Grid>
+</UserControl>

@@ -48,6 +48,10 @@ namespace JobAppManager.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("JobUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Location")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -55,6 +59,10 @@ namespace JobAppManager.Data.Migrations
 
                     b.Property<string>("Notes")
                         .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SalaryRange")
+                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Status")
@@ -107,6 +115,32 @@ namespace JobAppManager.Data.Migrations
                     b.ToTable("Contacts", (string)null);
                 });
 
+            modelBuilder.Entity("JobAppManager.Core.Entities.StatusChange", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ApplicationId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ChangedUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationId", "ChangedUtc");
+
+                    b.ToTable("StatusChanges", (string)null);
+                });
+
             modelBuilder.Entity("JobAppManager.Core.Entities.SubmittedItem", b =>
                 {
                     b.Property<int>("Id")
@@ -145,6 +179,17 @@ namespace JobAppManager.Data.Migrations
                     b.Navigation("Application");
                 });
 
+            modelBuilder.Entity("JobAppManager.Core.Entities.StatusChange", b =>
+                {
+                    b.HasOne("JobAppManager.Core.Entities.Application", "Application")
+                        .WithMany("StatusHistory")
+                        .HasForeignKey("ApplicationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Application");
+                });
+
             modelBuilder.Entity("JobAppManager.Core.Entities.SubmittedItem", b =>
                 {
                     b.HasOne("JobAppManager.Core.Entities.Application", "Application")
@@ -159,6 +204,8 @@ namespace JobAppManager.Data.Migrations
             modelBuilder.Entity("JobAppManager.Core.Entities.Application", b =>
                 {
                     b.Navigation("Contacts");
+
+                    b.Navigation("StatusHistory");
 
                     b.Navigation("SubmittedItems");
                 });

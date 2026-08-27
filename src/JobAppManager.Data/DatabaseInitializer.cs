@@ -21,9 +21,11 @@ public static class DatabaseInitializer
 
     /// <summary>Convenience for startup: build options, open a context, migrate, return it.
     /// The caller owns the returned context.</summary>
-    public static JobAppContext CreateAndMigrate(string? databasePath = null)
+    public static JobAppContext CreateAndMigrate(
+        string? databasePath = null,
+        TimeProvider? timeProvider = null)
     {
-        var context = new JobAppContext(BuildOptions(databasePath));
+        var context = new JobAppContext(BuildOptions(databasePath), timeProvider);
         Initialize(context);
         return context;
     }

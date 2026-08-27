@@ -15,9 +15,16 @@ public class Application
 
     public string Location { get; set; } = string.Empty;
 
+    public string? JobUrl { get; set; }
+
+    /// <summary>Free text, not a number: postings quote ranges, hourly rates, and "competitive".</summary>
+    public string? SalaryRange { get; set; }
+
     public InterestLevel InterestLevel { get; set; } = InterestLevel.Yellow;
 
-    public ApplicationStatus Status { get; set; } = ApplicationStatus.NoResponse;
+    /// <summary>The latest status. Move it with <c>IApplicationRepository.ChangeStatusAsync</c>
+    /// rather than assigning here, so <see cref="StatusHistory"/> stays in step.</summary>
+    public ApplicationStatus Status { get; set; } = ApplicationStatus.Applied;
 
     /// <summary>Which interview round, when <see cref="Status"/> is
     /// <see cref="ApplicationStatus.Interview"/>. Null otherwise.</summary>
@@ -36,4 +43,7 @@ public class Application
     public ICollection<SubmittedItem> SubmittedItems { get; set; } = new List<SubmittedItem>();
 
     public ICollection<Contact> Contacts { get; set; } = new List<Contact>();
+
+    /// <summary>Every status this application has been in, oldest first.</summary>
+    public ICollection<StatusChange> StatusHistory { get; set; } = new List<StatusChange>();
 }

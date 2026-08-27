@@ -1,0 +1,27 @@
+using JobAppManager.App.ViewModels;
+
+namespace JobAppManager.App.Services;
+
+/// <summary>How a page asks to move somewhere else. Implemented by <c>MainViewModel</c>, but
+/// pages depend on this rather than on the shell so nothing has a circular reference back to it.</summary>
+public interface INavigationService
+{
+    void GoToDashboard();
+
+    void GoToApplications();
+
+    /// <summary>Opens the editor on a blank application.</summary>
+    void GoToNewApplication();
+
+    /// <summary>Opens the editor on an existing application.</summary>
+    void GoToEditApplication(int applicationId);
+}
+
+/// <summary>Modal prompts, behind an interface so ViewModels stay testable and free of
+/// <c>System.Windows.MessageBox</c>.</summary>
+public interface IDialogService
+{
+    bool ConfirmDestructive(string title, string message, string confirmLabel);
+
+    void ShowError(string title, string message);
+}

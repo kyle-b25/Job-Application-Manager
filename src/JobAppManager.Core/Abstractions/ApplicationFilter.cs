@@ -33,6 +33,10 @@ public record ApplicationFilter
     /// <summary>Case-insensitive substring match against job title.</summary>
     public string? JobTitleContains { get; init; }
 
+    /// <summary>Case-insensitive substring match against company name *or* job title - the single
+    /// search box. Combines with the per-field filters by AND, but is an OR within itself.</summary>
+    public string? TextContains { get; init; }
+
     public bool? FromJobFair { get; init; }
 
     public ApplicationSortField SortBy { get; init; } = ApplicationSortField.DateApplied;

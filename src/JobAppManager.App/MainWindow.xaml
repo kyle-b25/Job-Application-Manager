@@ -1,0 +1,102 @@
+<Window x:Class="JobAppManager.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:JobAppManager.App.ViewModels"
+        d:DataContext="{d:DesignInstance Type=vm:MainViewModel}"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Job Application Manager"
+        Height="820" Width="1300"
+        MinHeight="600" MinWidth="1000"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource SurfaceWindowBrush}"
+        TextOptions.TextFormattingMode="Ideal"
+        UseLayoutRounding="True"
+        FontFamily="{StaticResource UiFontFamily}">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="228" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ==================== Sidebar ==================== -->
+        <Border Grid.Column="0" Background="{StaticResource SurfaceSidebarBrush}">
+            <Border BorderBrush="{StaticResource BorderHairlineBrush}" BorderThickness="0,0,1,0">
+                <DockPanel LastChildFill="False">
+
+                    <StackPanel DockPanel.Dock="Top" Margin="22,26,22,26">
+                        <StackPanel Orientation="Horizontal">
+                            <Border Width="30" Height="30"
+                                    Background="{StaticResource AccentBrush}"
+                                    CornerRadius="8">
+                                <TextBlock Text="&#xE821;"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           FontSize="15"
+                                           Foreground="{StaticResource TextOnAccentBrush}"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Margin="11,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="Job Hunt"
+                                           FontSize="14.5" FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextPrimaryBrush}" />
+                                <TextBlock Text="Application manager"
+                                           FontSize="10.5"
+                                           Foreground="{StaticResource TextFaintBrush}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- GroupName ties the three together so exactly one reads as active; each
+                         IsChecked is bound one-way from the shell, which is the source of truth. -->
+                    <StackPanel DockPanel.Dock="Top">
+                        <RadioButton Style="{StaticResource NavButton}"
+                                     GroupName="Nav"
+                                     IsChecked="{Binding IsDashboardSelected, Mode=OneWay}"
+                                     Command="{Binding GoToDashboardCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE9D9;" FontFamily="Segoe MDL2 Assets"
+                                           FontSize="14" VerticalAlignment="Center" Width="24" />
+                                <TextBlock Text="Dashboard" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
+
+                        <RadioButton Style="{StaticResource NavButton}"
+                                     GroupName="Nav"
+                                     IsChecked="{Binding IsApplicationsSelected, Mode=OneWay}"
+                                     Command="{Binding GoToApplicationsCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8A4;" FontFamily="Segoe MDL2 Assets"
+                                           FontSize="14" VerticalAlignment="Center" Width="24" />
+                                <TextBlock Text="Applications" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
+
+                        <RadioButton Style="{StaticResource NavButton}"
+                                     GroupName="Nav"
+                                     IsChecked="{Binding IsEditorSelected, Mode=OneWay}"
+                                     Command="{Binding GoToNewApplicationCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets"
+                                           FontSize="14" VerticalAlignment="Center" Width="24" />
+                                <TextBlock Text="Add New" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
+                    </StackPanel>
+
+                    <TextBlock DockPanel.Dock="Bottom"
+                               Margin="24,0,24,20"
+                               FontSize="10.5"
+                               Foreground="{StaticResource TextFaintBrush}"
+                               TextWrapping="Wrap"
+                               Text="Everything is stored locally on this PC." />
+                </DockPanel>
+            </Border>
+        </Border>
+
+        <!-- ==================== Content ==================== -->
+        <ContentControl Grid.Column="1" Content="{Binding CurrentPage}" />
+    </Grid>
+</Window>

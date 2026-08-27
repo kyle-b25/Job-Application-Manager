@@ -1,0 +1,174 @@
+<UserControl x:Class="JobAppManager.App.Views.DashboardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:JobAppManager.App.ViewModels"
+             xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:DashboardViewModel}">
+
+    <UserControl.Resources>
+        <!-- A summary card: big number, small caption. Content is the value, Tag is the caption. -->
+        <Style x:Key="StatCaption" TargetType="TextBlock" BasedOn="{StaticResource MutedText}">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <!-- ==================== Populated dashboard ==================== -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      Visibility="{Binding HasData, Converter={StaticResource Truthy}}">
+            <Grid Margin="32,28,32,32">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0">
+                    <TextBlock Text="{Binding Greeting}" Style="{StaticResource PageTitleText}" />
+                    <TextBlock Text="{Binding Subtitle}" Style="{StaticResource PageSubtitleText}" />
+                </StackPanel>
+
+                <!-- ========== Summary cards ========== -->
+                <UniformGrid Grid.Row="1" Columns="4" Margin="0,24,0,0">
+                    <Border Style="{StaticResource StatCard}" Margin="0,0,8,0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding TotalApplications}" Style="{StaticResource StatValueText}" />
+                            <TextBlock Text="Total applications" Style="{StaticResource StatCaption}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource StatCard}" Margin="8,0,8,0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding ActiveApplications}"
+                                       Style="{StaticResource StatValueText}"
+                                       Foreground="{StaticResource AccentBrush}" />
+                            <TextBlock Text="Still active" Style="{StaticResource StatCaption}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource StatCard}" Margin="8,0,8,0">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource StatValueText}"
+                                       Text="{Binding InterviewRate, Converter={StaticResource RateToPercent}}" />
+                            <TextBlock Text="Interview rate" Style="{StaticResource StatCaption}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource StatCard}" Margin="8,0,0,0">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource StatValueText}"
+                                       Text="{Binding OfferRate, Converter={StaticResource RateToPercent}}" />
+                            <TextBlock Text="Offer rate" Style="{StaticResource StatCaption}" />
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+
+                <!-- ========== Over time + status split ========== -->
+                <Grid Grid.Row="2" Margin="0,16,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="360" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,8,0">
+                        <StackPanel>
+                            <TextBlock Text="Applications over time" Style="{StaticResource SectionTitleText}" />
+                            <TextBlock Style="{StaticResource MutedText}" FontSize="12" Margin="0,3,0,0"
+                                       Text="{Binding AppliedLast30Days, StringFormat='{}{0} in the last 30 days'}" />
+
+                            <lvc:CartesianChart Height="240" Margin="0,16,0,0"
+                                                Series="{Binding OverTimeSeries}"
+                                                XAxes="{Binding OverTimeXAxes}"
+                                                YAxes="{Binding OverTimeYAxes}"
+                                                TooltipBackgroundPaint="{Binding TooltipBackgroundPaint}"
+                                                TooltipTextPaint="{Binding TooltipTextPaint}"
+                                                LegendPosition="Hidden" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="1" Style="{StaticResource Card}" Margin="8,0,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Where they stand" Style="{StaticResource SectionTitleText}" />
+                            <TextBlock Style="{StaticResource MutedText}" FontSize="12" Margin="0,3,0,0"
+                                       Text="Current stage of every application" />
+
+                            <lvc:PieChart Height="240" Margin="0,16,0,0"
+                                          Series="{Binding StatusSeries}"
+                                          LegendPosition="Bottom"
+                                          LegendTextPaint="{Binding LegendTextPaint}"
+                                          LegendTextSize="11.5"
+                                          TooltipBackgroundPaint="{Binding TooltipBackgroundPaint}"
+                                          TooltipTextPaint="{Binding TooltipTextPaint}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- ========== Stage durations ========== -->
+                <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,16,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Average time in each stage" Style="{StaticResource SectionTitleText}" />
+                        <TextBlock Style="{StaticResource MutedText}" FontSize="12" Margin="0,3,0,0"
+                                   Text="How long applications sat in a stage before moving on" />
+
+                        <lvc:CartesianChart Height="220" Margin="0,16,0,0"
+                                            Series="{Binding StageDurationSeries}"
+                                            XAxes="{Binding StageDurationXAxes}"
+                                            YAxes="{Binding StageDurationYAxes}"
+                                            LegendPosition="Hidden"
+                                            TooltipBackgroundPaint="{Binding TooltipBackgroundPaint}"
+                                            TooltipTextPaint="{Binding TooltipTextPaint}"
+                                            Visibility="{Binding HasStageDurations, Converter={StaticResource Truthy}}" />
+
+                        <!-- One status change is not enough to measure anything, and an empty
+                             axis would read as "zero days" rather than "nothing to show yet". -->
+                        <TextBlock Style="{StaticResource MutedText}"
+                                   Margin="0,24,0,10"
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   Text="Move an application to its next stage and the timings start showing up here."
+                                   Visibility="{Binding HasStageDurations, Converter={StaticResource Truthy}, ConverterParameter=Invert}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </ScrollViewer>
+
+        <!-- ==================== Empty state ==================== -->
+        <Border Style="{StaticResource Card}"
+                MaxWidth="460" Padding="40,44"
+                VerticalAlignment="Center" HorizontalAlignment="Center"
+                Visibility="{Binding IsEmpty, Converter={StaticResource Truthy}}">
+            <StackPanel HorizontalAlignment="Center">
+                <Border Width="66" Height="66" CornerRadius="33"
+                        Background="{StaticResource AccentDimBrush}"
+                        HorizontalAlignment="Center">
+                    <TextBlock Text="&#xE9D9;" FontFamily="Segoe MDL2 Assets"
+                               FontSize="27"
+                               Foreground="{StaticResource AccentBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+
+                <TextBlock Text="{Binding Greeting}"
+                           Style="{StaticResource SectionTitleText}"
+                           FontSize="19"
+                           Margin="0,20,0,0"
+                           HorizontalAlignment="Center" />
+
+                <TextBlock Style="{StaticResource MutedText}"
+                           Margin="0,8,0,0"
+                           TextAlignment="Center" TextWrapping="Wrap"
+                           Text="There is nothing to chart yet. Add your first application and this page fills in with your rates, your pipeline, and how long each stage is taking." />
+
+                <Button Content="Add your first application"
+                        Style="{StaticResource PrimaryButton}"
+                        Margin="0,24,0,0"
+                        HorizontalAlignment="Center"
+                        Command="{Binding AddFirstCommand}" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

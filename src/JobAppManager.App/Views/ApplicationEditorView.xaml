@@ -1,0 +1,375 @@
+<UserControl x:Class="JobAppManager.App.Views.ApplicationEditorView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:JobAppManager.App.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:ApplicationEditorViewModel}">
+
+    <UserControl.Resources>
+        <!-- Shows the first validation message under a field. Bound to the same property name
+             the input above it is bound to, via ElementName. -->
+        <Style x:Key="ErrorText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="Margin" Value="0,5,0,0" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
+        <Style x:Key="FieldStack" TargetType="StackPanel">
+            <Setter Property="Margin" Value="0,0,0,16" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="32,28,32,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ==================== Header ==================== -->
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="{Binding Title}" Style="{StaticResource PageTitleText}" />
+            <TextBlock Text="{Binding Subtitle}" Style="{StaticResource PageSubtitleText}" />
+        </StackPanel>
+
+        <!-- ==================== Form ==================== -->
+        <ScrollViewer Grid.Row="1" Margin="0,22,0,0" VerticalScrollBarVisibility="Auto"
+                      Padding="0,0,10,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="330" />
+                </Grid.ColumnDefinitions>
+
+                <!-- ========== Left: the role ========== -->
+                <StackPanel Grid.Column="0" Margin="0,0,8,24">
+
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="The role" Style="{StaticResource SectionTitleText}"
+                                       Margin="0,0,0,18" />
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Style="{StaticResource FieldStack}"
+                                            Margin="0,0,8,16">
+                                    <TextBlock Text="COMPANY" Style="{StaticResource FieldLabelText}" />
+                                    <TextBox x:Name="CompanyBox" Style="{StaticResource FieldTextBox}"
+                                             Text="{Binding CompanyName, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+                                    <TextBlock Style="{StaticResource ErrorText}"
+                                               Text="{Binding (Validation.Errors)/ErrorContent, ElementName=CompanyBox}"
+                                               Visibility="{Binding (Validation.HasError), ElementName=CompanyBox, Converter={StaticResource Truthy}}" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Style="{StaticResource FieldStack}"
+                                            Margin="8,0,0,16">
+                                    <TextBlock Text="JOB TITLE" Style="{StaticResource FieldLabelText}" />
+                                    <TextBox x:Name="TitleBox" Style="{StaticResource FieldTextBox}"
+                                             Text="{Binding JobTitle, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+                                    <TextBlock Style="{StaticResource ErrorText}"
+                                               Text="{Binding (Validation.Errors)/ErrorContent, ElementName=TitleBox}"
+                                               Visibility="{Binding (Validation.HasError), ElementName=TitleBox, Converter={StaticResource Truthy}}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Style="{StaticResource FieldStack}"
+                                            Margin="0,0,8,16">
+                                    <TextBlock Text="LOCATION" Style="{StaticResource FieldLabelText}" />
+                                    <TextBox Style="{StaticResource FieldTextBox}"
+                                             Text="{Binding Location, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Style="{StaticResource FieldStack}"
+                                            Margin="8,0,0,16">
+                                    <TextBlock Text="SALARY RANGE" Style="{StaticResource FieldLabelText}" />
+                                    <TextBox Style="{StaticResource FieldTextBox}"
+                                             Text="{Binding SalaryRange, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <StackPanel Style="{StaticResource FieldStack}">
+                                <TextBlock Text="JOB URL" Style="{StaticResource FieldLabelText}" />
+                                <TextBox x:Name="UrlBox" Style="{StaticResource FieldTextBox}"
+                                         Text="{Binding JobUrl, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+                                <TextBlock Style="{StaticResource ErrorText}"
+                                           Text="{Binding (Validation.Errors)/ErrorContent, ElementName=UrlBox}"
+                                           Visibility="{Binding (Validation.HasError), ElementName=UrlBox, Converter={StaticResource Truthy}}" />
+                            </StackPanel>
+
+                            <StackPanel Margin="0,0,0,0">
+                                <TextBlock Text="NOTES" Style="{StaticResource FieldLabelText}" />
+                                <TextBox Style="{StaticResource MultilineTextBox}"
+                                         Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ========== What I sent ========== -->
+                    <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,14">
+                                <StackPanel>
+                                    <TextBlock Text="What I sent them" Style="{StaticResource SectionTitleText}" />
+                                    <TextBlock Style="{StaticResource MutedText}" FontSize="12" Margin="0,3,0,0"
+                                               Text="Name the exact resume or cover letter, so you know which one got the reply." />
+                                </StackPanel>
+                                <Button Content="Add item" Style="{StaticResource SecondaryButton}"
+                                        Padding="12,6"
+                                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                                        Command="{Binding AddSubmittedItemCommand}" />
+                            </Grid>
+
+                            <ItemsControl ItemsSource="{Binding SubmittedItems}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="150" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="150" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <ComboBox Grid.Column="0" Style="{StaticResource FieldComboBox}"
+                                                      ItemsSource="{Binding DataContext.SubmissionKinds, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                      SelectedItem="{Binding Kind}">
+                                                <ComboBox.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDisplayName}}" />
+                                                    </DataTemplate>
+                                                </ComboBox.ItemTemplate>
+                                            </ComboBox>
+
+                                            <TextBox Grid.Column="1" Margin="8,0"
+                                                     Style="{StaticResource FieldTextBox}"
+                                                     Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
+
+                                            <DatePicker Grid.Column="2"
+                                                        Style="{StaticResource FieldDatePicker}"
+                                                        SelectedDate="{Binding SubmittedOn, Converter={StaticResource DateOnly}}" />
+
+                                            <Button Grid.Column="3" Margin="8,0,0,0"
+                                                    Style="{StaticResource GhostButton}"
+                                                    Content="&#xE74D;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                                    ToolTip="Remove"
+                                                    Command="{Binding DataContext.RemoveSubmittedItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Style="{StaticResource MutedText}" FontSize="12"
+                                       Text="Nothing recorded yet."
+                                       Visibility="{Binding SubmittedItems.Count, Converter={StaticResource Truthy}, ConverterParameter=Invert}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ========== Who I talked to ========== -->
+                    <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,14">
+                                <StackPanel>
+                                    <TextBlock Text="Who I talked to" Style="{StaticResource SectionTitleText}" />
+                                    <TextBlock Style="{StaticResource MutedText}" FontSize="12" Margin="0,3,0,0"
+                                               Text="Recruiters, referrals, anyone worth following up with." />
+                                </StackPanel>
+                                <Button Content="Add contact" Style="{StaticResource SecondaryButton}"
+                                        Padding="12,6"
+                                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                                        Command="{Binding AddContactCommand}" />
+                            </Grid>
+
+                            <ItemsControl ItemsSource="{Binding Contacts}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="130" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBox Grid.Column="0" Style="{StaticResource FieldTextBox}"
+                                                     Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="Name" />
+
+                                            <TextBox Grid.Column="1" Margin="8,0"
+                                                     Style="{StaticResource FieldTextBox}"
+                                                     Text="{Binding Email, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="Email" />
+
+                                            <TextBox Grid.Column="2" Style="{StaticResource FieldTextBox}"
+                                                     Text="{Binding Role, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="Role" />
+
+                                            <Button Grid.Column="3" Margin="8,0,0,0"
+                                                    Style="{StaticResource GhostButton}"
+                                                    Content="&#xE74D;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                                    ToolTip="Remove"
+                                                    Command="{Binding DataContext.RemoveContactCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Style="{StaticResource MutedText}" FontSize="12"
+                                       Text="Nothing recorded yet."
+                                       Visibility="{Binding Contacts.Count, Converter={StaticResource Truthy}, ConverterParameter=Invert}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- ========== Right: pipeline ========== -->
+                <StackPanel Grid.Column="1" Margin="8,0,0,24">
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Pipeline" Style="{StaticResource SectionTitleText}"
+                                       Margin="0,0,0,18" />
+
+                            <StackPanel Style="{StaticResource FieldStack}">
+                                <TextBlock Text="STAGE" Style="{StaticResource FieldLabelText}" />
+                                <ComboBox Style="{StaticResource FieldComboBox}"
+                                          ItemsSource="{Binding Statuses}"
+                                          SelectedItem="{Binding Status}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <ContentControl Content="{Binding}"
+                                                            ContentTemplate="{StaticResource StatusBadgeTemplate}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <StackPanel Style="{StaticResource FieldStack}"
+                                        Visibility="{Binding ShowsInterviewRound, Converter={StaticResource Truthy}}">
+                                <TextBlock Text="INTERVIEW ROUND" Style="{StaticResource FieldLabelText}" />
+                                <TextBox x:Name="RoundBox" Style="{StaticResource FieldTextBox}"
+                                         Text="{Binding InterviewRound, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True, TargetNullValue=''}" />
+                                <TextBlock Style="{StaticResource ErrorText}"
+                                           Text="{Binding (Validation.Errors)/ErrorContent, ElementName=RoundBox}"
+                                           Visibility="{Binding (Validation.HasError), ElementName=RoundBox, Converter={StaticResource Truthy}}" />
+                            </StackPanel>
+
+                            <StackPanel Style="{StaticResource FieldStack}"
+                                        Visibility="{Binding IsStatusChanging, Converter={StaticResource Truthy}}">
+                                <TextBlock Text="WHY THE MOVE (OPTIONAL)" Style="{StaticResource FieldLabelText}" />
+                                <TextBox Style="{StaticResource FieldTextBox}"
+                                         Text="{Binding StatusChangeNote, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Style="{StaticResource MutedText}" FontSize="11.5" Margin="0,6,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="Saved to the timeline alongside this stage change." />
+                            </StackPanel>
+
+                            <StackPanel Style="{StaticResource FieldStack}">
+                                <TextBlock Text="DATE APPLIED" Style="{StaticResource FieldLabelText}" />
+                                <DatePicker x:Name="DateBox" Style="{StaticResource FieldDatePicker}"
+                                            SelectedDate="{Binding DateApplied, Converter={StaticResource DateOnly}, ValidatesOnNotifyDataErrors=True}" />
+                                <TextBlock Style="{StaticResource ErrorText}"
+                                           Text="{Binding (Validation.Errors)/ErrorContent, ElementName=DateBox}"
+                                           Visibility="{Binding (Validation.HasError), ElementName=DateBox, Converter={StaticResource Truthy}}" />
+                            </StackPanel>
+
+                            <StackPanel Style="{StaticResource FieldStack}">
+                                <TextBlock Text="INTEREST" Style="{StaticResource FieldLabelText}" />
+                                <ComboBox Style="{StaticResource FieldComboBox}"
+                                          ItemsSource="{Binding InterestLevels}"
+                                          SelectedItem="{Binding InterestLevel}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal">
+                                                <ContentControl Content="{Binding}"
+                                                                ContentTemplate="{StaticResource InterestDotTemplate}" />
+                                                <TextBlock Margin="9,0,0,0"
+                                                           Text="{Binding Converter={StaticResource EnumDisplayName}}" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <CheckBox Style="{StaticResource FieldCheckBox}"
+                                      Content="Came from a job fair"
+                                      IsChecked="{Binding FromJobFair}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ========== Timeline ========== -->
+                    <Border Style="{StaticResource Card}" Margin="0,16,0,0"
+                            Visibility="{Binding HasStatusHistory, Converter={StaticResource Truthy}}">
+                        <StackPanel>
+                            <TextBlock Text="Timeline" Style="{StaticResource SectionTitleText}"
+                                       Margin="0,0,0,14" />
+
+                            <ItemsControl ItemsSource="{Binding StatusHistory}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,0,0,14">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- The connecting rail: a dot on a line, so a run of
+                                                 changes reads as one sequence. -->
+                                            <Grid Grid.Column="0" Width="14">
+                                                <Rectangle Width="1" VerticalAlignment="Stretch"
+                                                           HorizontalAlignment="Center"
+                                                           Fill="{StaticResource BorderHairlineBrush}" />
+                                                <Ellipse Width="9" Height="9"
+                                                         VerticalAlignment="Top" HorizontalAlignment="Center"
+                                                         Margin="0,4,0,0"
+                                                         Fill="{Binding Status, Converter={StaticResource StatusBrush}}" />
+                                            </Grid>
+
+                                            <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                                <TextBlock Text="{Binding DisplayName}"
+                                                           FontSize="13" FontWeight="SemiBold"
+                                                           Foreground="{Binding Status, Converter={StaticResource StatusBrush}}" />
+                                                <TextBlock Text="{Binding WhenText}"
+                                                           Style="{StaticResource MutedText}" FontSize="11.5"
+                                                           Margin="0,2,0,0" />
+                                                <TextBlock Text="{Binding Note}"
+                                                           Style="{StaticResource MutedText}" FontSize="12"
+                                                           Margin="0,5,0,0" TextWrapping="Wrap"
+                                                           Visibility="{Binding Note, Converter={StaticResource Truthy}}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+
+        <!-- ==================== Action bar ==================== -->
+        <Border Grid.Row="2" Margin="0,0,0,0" Padding="0,16,0,20"
+                BorderBrush="{StaticResource BorderHairlineBrush}" BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Cancel" Style="{StaticResource SecondaryButton}"
+                        Command="{Binding CancelCommand}" />
+                <Button Content="{Binding SaveLabel}" Style="{StaticResource PrimaryButton}"
+                        Margin="10,0,0,0"
+                        IsDefault="True"
+                        Command="{Binding SaveCommand}" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

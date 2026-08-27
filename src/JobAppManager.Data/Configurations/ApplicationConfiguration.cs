@@ -16,6 +16,8 @@ public class ApplicationConfiguration : IEntityTypeConfiguration<Application>
         builder.Property(a => a.JobTitle).IsRequired().HasMaxLength(200);
         builder.Property(a => a.Location).IsRequired().HasMaxLength(200);
         builder.Property(a => a.Notes).HasMaxLength(4000);
+        builder.Property(a => a.JobUrl).HasMaxLength(2000);
+        builder.Property(a => a.SalaryRange).HasMaxLength(100);
 
         builder.Property(a => a.InterestLevel).IsRequired();
         builder.Property(a => a.Status).IsRequired();
@@ -33,6 +35,11 @@ public class ApplicationConfiguration : IEntityTypeConfiguration<Application>
         builder.HasMany(a => a.Contacts)
             .WithOne(c => c.Application!)
             .HasForeignKey(c => c.ApplicationId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(a => a.StatusHistory)
+            .WithOne(s => s.Application!)
+            .HasForeignKey(s => s.ApplicationId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

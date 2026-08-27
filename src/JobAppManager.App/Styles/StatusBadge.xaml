@@ -1,0 +1,43 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:conv="clr-namespace:JobAppManager.App.Converters">
+
+    <conv:StatusBrushConverter x:Key="StatusBrush" />
+    <conv:InterestBrushConverter x:Key="InterestBrush" />
+    <conv:TruthyToVisibilityConverter x:Key="Truthy" />
+    <conv:RateToPercentConverter x:Key="RateToPercent" />
+    <conv:EnumDisplayNameConverter x:Key="EnumDisplayName" />
+    <conv:DateOnlyConverter x:Key="DateOnly" />
+
+    <!-- A status badge, driven entirely by the bound ApplicationStatus: tinted background,
+         saturated text, both looked up from Colors.xaml by the converter. Use it as
+         <ContentControl ContentTemplate="{StaticResource StatusBadgeTemplate}" Content="{Binding Status}" />
+         so the DataContext is the status value itself. -->
+    <DataTemplate x:Key="StatusBadgeTemplate">
+        <Border Background="{Binding Converter={StaticResource StatusBrush}, ConverterParameter=Dim}"
+                CornerRadius="{StaticResource PillCornerRadius}"
+                Padding="10,4"
+                HorizontalAlignment="Left"
+                SnapsToDevicePixels="True">
+            <StackPanel Orientation="Horizontal">
+                <Ellipse Width="6" Height="6" VerticalAlignment="Center"
+                         Fill="{Binding Converter={StaticResource StatusBrush}}" />
+                <TextBlock Margin="7,0,0,0"
+                           FontFamily="{StaticResource UiFontFamily}"
+                           FontSize="11.5"
+                           FontWeight="SemiBold"
+                           Foreground="{Binding Converter={StaticResource StatusBrush}}"
+                           Text="{Binding Converter={StaticResource EnumDisplayName}}" />
+            </StackPanel>
+        </Border>
+    </DataTemplate>
+
+    <!-- Interest level as a single dot with a tooltip - it is secondary information and a second
+         full badge per row would compete with the status. -->
+    <DataTemplate x:Key="InterestDotTemplate">
+        <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                 Fill="{Binding Converter={StaticResource InterestBrush}}"
+                 ToolTip="{Binding Converter={StaticResource EnumDisplayName}, StringFormat='Interest: {0}'}" />
+    </DataTemplate>
+
+</ResourceDictionary>

@@ -8,13 +8,27 @@ namespace JobAppManager.Data.Repositories;
 public class ApplicationRepository : IApplicationRepository
 {
     private readonly JobAppContext _context;
+    private readonly TimeProvider _timeProvider;
 
-    public ApplicationRepository(JobAppContext context) => _context = context;
+    /// <param name="timeProvider">Only <see cref="GetStatisticsAsync"/> reads it, for the
+    /// "last N days" windows. Optional so existing call sites are unaffected.</param>
+    public ApplicationRepository(JobAppContext context, TimeProvider? timeProvider = null)
+    {
+        _context = context;
+        _timeProvider = timeProvider ?? TimeProvider.System;
+    }
 
     public async Task<Application> AddAsync(
         Application application,
         CancellationToken cancellationToken = default)
     {
+        // Every application starts its history at whatever status it was created in, so
+        // "days in stage" has a beginning to measure from even for a row nobody ever advances.
+        if (application.StatusHistory.Count == 0)
+        {
+            application.StatusHistory.Add(new StatusChange { Status = application.Status });
+        }
+
         _context.Applications.Add(application);
         await _context.SaveChangesAsync(cancellationToken);
         return application;
@@ -49,10 +63,51 @@ public class ApplicationRepository : IApplicationRepository
         return true;
     }
 
+    public async Task<bool> ChangeStatusAsync(
+        int applicationId,
+        ApplicationStatus newStatus,
+        string? note = null,
+        CancellationToken cancellationToken = default)
+    {
+        var application = await _context.Applications
+            .FirstOrDefaultAsync(a => a.Id == applicationId, cancellationToken);
+
+        if (application is null)
+        {
+            return false;
+        }
+
+        // Re-entering the same status is not a transition; recording it would inflate the
+        // history and put a zero-length stint into the stage-duration average.
+        if (application.Status == newStatus)
+        {
+            return true;
+        }
+
+        application.Status = newStatus;
+
+        // Round numbering only means anything inside Interview.
+        if (newStatus != ApplicationStatus.Interview)
+        {
+            application.InterviewRound = null;
+        }
+
+        _context.StatusChanges.Add(new StatusChange
+        {
+            ApplicationId = applicationId,
+            Status = newStatus,
+            Note = note
+        });
+
+        await _context.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public Task<Application?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
         _context.Applications
             .Include(a => a.SubmittedItems)
             .Include(a => a.Contacts)
+            .Include(a => a.StatusHistory.OrderBy(s => s.ChangedUtc))
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
 
     public async Task<IReadOnlyList<Application>> QueryAsync(
@@ -85,14 +140,22 @@ public class ApplicationRepository : IApplicationRepository
         // in SQLite, while LIKE is case-insensitive for ASCII - what a search box should do.
         if (!string.IsNullOrWhiteSpace(filter.CompanyContains))
         {
-            var pattern = $"%{filter.CompanyContains}%";
-            query = query.Where(a => EF.Functions.Like(a.CompanyName, pattern));
+            var pattern = ToLikePattern(filter.CompanyContains);
+            query = query.Where(a => EF.Functions.Like(a.CompanyName, pattern, LikeEscape));
         }
 
         if (!string.IsNullOrWhiteSpace(filter.JobTitleContains))
         {
-            var pattern = $"%{filter.JobTitleContains}%";
-            query = query.Where(a => EF.Functions.Like(a.JobTitle, pattern));
+            var pattern = ToLikePattern(filter.JobTitleContains);
+            query = query.Where(a => EF.Functions.Like(a.JobTitle, pattern, LikeEscape));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.TextContains))
+        {
+            var pattern = ToLikePattern(filter.TextContains);
+            query = query.Where(a =>
+                EF.Functions.Like(a.CompanyName, pattern, LikeEscape)
+                || EF.Functions.Like(a.JobTitle, pattern, LikeEscape));
         }
 
         if (filter.FromJobFair is { } jobFair)
@@ -109,7 +172,9 @@ public class ApplicationRepository : IApplicationRepository
         int dailyCountWindowDays = 30,
         CancellationToken cancellationToken = default)
     {
-        var today = DateOnly.FromDateTime(DateTime.Now);
+        // Local, not UTC, and deliberately so: DateApplied is a calendar date the user typed in,
+        // so "the last 7 days" has to be counted in the user's own days, not UTC's.
+        var today = DateOnly.FromDateTime(_timeProvider.GetLocalNow().DateTime);
         var last7 = today.AddDays(-6);   // inclusive of today, so 7 calendar days
         var last30 = today.AddDays(-29);
         var windowStart = today.AddDays(-(Math.Max(dailyCountWindowDays, 1) - 1));
@@ -138,21 +203,118 @@ public class ApplicationRepository : IApplicationRepository
         var appliedLast30 = await _context.Applications
             .CountAsync(a => a.DateApplied >= last30 && a.DateApplied <= today, cancellationToken);
 
+        var monthlyCounts = await _context.Applications
+            .GroupBy(a => new { a.DateApplied.Year, a.DateApplied.Month })
+            .Select(g => new { g.Key.Year, g.Key.Month, Count = g.Count() })
+            .OrderBy(x => x.Year).ThenBy(x => x.Month)
+            .ToListAsync(cancellationToken);
+
         var total = statusCounts.Sum(x => x.Count);
+
+        var byStatus = ZeroFill<ApplicationStatus>(
+            statusCounts.ToDictionary(x => x.Key, x => x.Count));
+
+        var active = total
+            - byStatus[ApplicationStatus.Rejected]
+            - byStatus[ApplicationStatus.Withdrawn];
+
+        // Rates are answered from history, not the current status: an application that was
+        // interviewed and then rejected still counts as an interview reached.
+        var reached = await _context.StatusChanges
+            .GroupBy(s => s.ApplicationId)
+            .Select(g => new
+            {
+                Submitted = g.Any(s => s.Status != ApplicationStatus.Wishlist),
+                Interviewed = g.Any(s =>
+                    s.Status == ApplicationStatus.PhoneScreen ||
+                    s.Status == ApplicationStatus.Interview ||
+                    s.Status == ApplicationStatus.Offer),
+                Offered = g.Any(s => s.Status == ApplicationStatus.Offer)
+            })
+            .ToListAsync(cancellationToken);
+
+        var submitted = reached.Count(x => x.Submitted);
 
         return new JobHuntStatistics
         {
             TotalApplications = total,
-            CountByStatus = ZeroFill<ApplicationStatus>(
-                statusCounts.ToDictionary(x => x.Key, x => x.Count)),
+            ActiveApplications = active,
+            InterviewRate = Rate(reached.Count(x => x.Submitted && x.Interviewed), submitted),
+            OfferRate = Rate(reached.Count(x => x.Submitted && x.Offered), submitted),
+            CountByStatus = byStatus,
             CountByInterest = ZeroFill<InterestLevel>(
                 interestCounts.ToDictionary(x => x.Key, x => x.Count)),
             AppliedLast7Days = appliedLast7,
             AppliedLast30Days = appliedLast30,
             DailyCounts = dailyCounts
                 .Select(x => new DailyApplicationCount(x.Date, x.Count))
-                .ToList()
+                .ToList(),
+            MonthlyCounts = monthlyCounts
+                .Select(x => new MonthlyApplicationCount(x.Year, x.Month, x.Count))
+                .ToList(),
+            AverageDaysInStage = await GetAverageDaysInStageAsync(cancellationToken)
         };
+    }
+
+    /// <summary>Mean days each stage was held before the next transition, over every completed
+    /// stint. The stage an application currently sits in contributes nothing - that stint has no
+    /// end yet, and counting "so far" would drag every average toward zero as rows are added.</summary>
+    private async Task<IReadOnlyList<StageDuration>> GetAverageDaysInStageAsync(
+        CancellationToken cancellationToken)
+    {
+        // Projected to three columns and paired in memory: SQLite has no window functions EF 8
+        // can translate here, and one row per status change is a small table by construction.
+        var changes = await _context.StatusChanges
+            .OrderBy(s => s.ApplicationId).ThenBy(s => s.ChangedUtc).ThenBy(s => s.Id)
+            .Select(s => new { s.ApplicationId, s.Status, s.ChangedUtc })
+            .ToListAsync(cancellationToken);
+
+        var stints = new Dictionary<ApplicationStatus, (double TotalDays, int Count)>();
+
+        for (var i = 1; i < changes.Count; i++)
+        {
+            var previous = changes[i - 1];
+            var current = changes[i];
+
+            // Only consecutive rows for the *same* application form a stint.
+            if (previous.ApplicationId != current.ApplicationId)
+            {
+                continue;
+            }
+
+            var days = (current.ChangedUtc - previous.ChangedUtc).TotalDays;
+            var existing = stints.TryGetValue(previous.Status, out var v) ? v : (0d, 0);
+            stints[previous.Status] = (existing.Item1 + days, existing.Item2 + 1);
+        }
+
+        return stints
+            .OrderBy(kvp => kvp.Key)
+            .Select(kvp => new StageDuration(
+                kvp.Key,
+                kvp.Value.TotalDays / kvp.Value.Count,
+                kvp.Value.Count))
+            .ToList();
+    }
+
+    /// <summary>Share, or zero when there is nothing to take a share of.</summary>
+    private static double Rate(int numerator, int denominator) =>
+        denominator == 0 ? 0d : (double)numerator / denominator;
+
+    /// <summary>SQLite has no default LIKE escape character, so one has to be declared per call.</summary>
+    private const string LikeEscape = "\\";
+
+    /// <summary>Wraps a search term in wildcards, escaping any the user actually typed. Without
+    /// this a search for "%" matches every row and "_" matches any single character - a search
+    /// box should look for the characters someone typed, not treat them as a pattern.</summary>
+    private static string ToLikePattern(string term)
+    {
+        // The escape character goes first, or it would escape the escapes added after it.
+        var escaped = term
+            .Replace(@"\", @"\\")
+            .Replace("%", @"\%")
+            .Replace("_", @"\_");
+
+        return $"%{escaped}%";
     }
 
     private static IQueryable<Application> ApplySort(
