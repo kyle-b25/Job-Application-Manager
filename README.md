@@ -57,6 +57,34 @@ anything time-dependent uses a `FixedClock` so results do not shift with the mac
 timezone. The ViewModel tests deliberately go through the real repository — only the navigation
 and dialog boundaries are faked.
 
+## Packaging
+
+To produce an installer you can hand to someone else:
+
+```powershell
+winget install JRSoftware.InnoSetup           # one time
+powershell -ExecutionPolicy Bypass -File build\build-installer.ps1
+```
+
+That writes `artifacts\JobApplicationManager-Setup-<version>.exe` — a single file you can email or
+drop in a shared folder. Recipients need **nothing installed**: the app is published
+self-contained, so it carries its own .NET 8 runtime.
+
+The version comes from `<Version>` in `Directory.Build.props`. Bump it there and nowhere else;
+`build-installer.ps1` reads it and passes it to the Inno Setup script.
+
+What the installer does on the target machine:
+
+- Installs **per user** to `%LOCALAPPDATA%\Programs\JobApplicationManager` — no admin rights, no
+  UAC prompt.
+- Adds a Start Menu entry, and a desktop shortcut if the wizard checkbox is ticked.
+- Registers an uninstaller in Add/Remove Programs.
+- **Uninstalling keeps your data.** The database lives in `%LOCALAPPDATA%\JobApplicationManager\`,
+  which the installer never touches, so reinstalling picks your applications back up.
+
+Re-running a newer installer upgrades in place rather than adding a second copy. `build\publish.ps1`
+does the publish step on its own if you just want the app folder without an installer.
+
 ## Data
 
 The database is created at `%LOCALAPPDATA%\JobApplicationManager\jobapps.db` on first run, and

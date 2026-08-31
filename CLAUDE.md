@@ -35,6 +35,33 @@ dotnet test --filter "FullyQualifiedName~StatisticsTests"
 dotnet test tests\JobAppManager.App.Tests
 ```
 
+### Packaging
+
+```powershell
+winget install JRSoftware.InnoSetup           # one time
+powershell -ExecutionPolicy Bypass -File build\build-installer.ps1
+```
+
+Produces `artifacts\JobApplicationManager-Setup-<version>.exe`, a per-user installer
+(`%LOCALAPPDATA%\Programs\JobApplicationManager`, no admin) carrying its own .NET 8 runtime.
+
+The version lives in `<Version>` in `Directory.Build.props` and nowhere else —
+`build-installer.ps1` parses it out and passes it to Inno as `/DAppVersion`.
+
+Three things about the publish shape are deliberate and should not be "tidied up":
+
+- **A folder publish, not `PublishSingleFile`.** Single-file has to unpack `libSkiaSharp.dll`,
+  `libHarfBuzzSharp.dll`, and `e_sqlite3.dll` into `%TEMP%` on every cold start, which costs
+  startup time and is the shape corporate antivirus flags. Inno compresses the folder anyway
+  — 200 MB published lands as a 59 MB setup.
+- **No `PublishTrimmed`.** WPF is not trim-safe, and EF Core's migrations reflect over the model.
+- **No `[UninstallDelete]` in the .iss.** The database is in `%LOCALAPPDATA%\JobApplicationManager\`,
+  which the installer never creates, so an empty section is exactly what keeps a user's
+  applications across an uninstall. The correct behaviour here looks like an omission.
+
+`AppId` in `installer\JobApplicationManager.iss` is the upgrade key — changing that GUID gives
+every existing user a second, parallel installation.
+
 ### Migrations
 
 `dotnet-ef` 8.0.8 is installed globally. Always pass `--project src\JobAppManager.Data` —
