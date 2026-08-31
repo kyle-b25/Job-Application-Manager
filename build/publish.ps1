@@ -10,11 +10,16 @@
 
     No PublishTrimmed: WPF is not trim-safe, and EF Core's migrations reflect over the model at
     runtime.
+
+    -SingleFile switches to one self-extracting exe instead. That is NOT what the installer packs;
+    it exists for the standalone copy on the desktop, where a folder of 200-odd files would be
+    unusable and the slower cold start is the price of that convenience.
 #>
 [CmdletBinding()]
 param(
     [string] $Configuration = 'Release',
-    [string] $OutputDir
+    [string] $OutputDir,
+    [switch] $SingleFile
 )
 
 $ErrorActionPreference = 'Stop'
@@ -42,6 +47,14 @@ if (Test-Path $OutputDir) {
     Remove-Item $OutputDir -Recurse -Force
 }
 
+$extra = @()
+if ($SingleFile) {
+    # IncludeNativeLibrariesForSelfExtract is required, not optional: libSkiaSharp,
+    # libHarfBuzzSharp and e_sqlite3 are unmanaged, and without it they stay as loose DLLs
+    # beside the exe - which defeats the whole point of a single portable file.
+    $extra = @('-p:PublishSingleFile=true', '-p:IncludeNativeLibrariesForSelfExtract=true')
+}
+
 Write-Host "Publishing $project -> $OutputDir" -ForegroundColor Cyan
 
 dotnet publish $project `
@@ -49,6 +62,7 @@ dotnet publish $project `
     --runtime win-x64 `
     --self-contained true `
     -p:PublishReadyToRun=true `
+    @extra `
     --output $OutputDir
 
 if ($LASTEXITCODE -ne 0) {

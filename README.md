@@ -85,6 +85,17 @@ What the installer does on the target machine:
 Re-running a newer installer upgrades in place rather than adding a second copy. `build\publish.ps1`
 does the publish step on its own if you just want the app folder without an installer.
 
+### A standalone exe, no installer
+
+```powershell
+powershell -ExecutionPolicy Bypass -File build\publish.ps1 -SingleFile -OutputDir <somewhere>
+```
+
+Produces one ~180 MB `JobApplicationManager.exe` that runs from anywhere with nothing installed —
+handy for a copy kept on the desktop or a USB stick. It costs a slower cold start than the
+installed build, because the Skia, HarfBuzz and SQLite native DLLs are unpacked to `%TEMP%` on
+every launch. It reads the same database as an installed copy, so the two stay in sync.
+
 ## Data
 
 The database is created at `%LOCALAPPDATA%\JobApplicationManager\jobapps.db` on first run, and
